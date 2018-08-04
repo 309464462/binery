@@ -1,6 +1,24 @@
 ### 第一章 建立Android系统开发环境
 
+#### 1.1 安装系统
+
+#### 1.2 安装开发包
+
+#### 1.3 安装一些工具
+
+#### 1.4 下载源码
+
+> 如果实用谷歌手机，那么就应该考虑源码的版本问题，可以通过以下链接查找，需要翻墙
+>
+> https://source.android.com/setup/start/build-numbers#source-code-tags-and-builds
+
+
+
 ### 第二章 Android 的编译环境Build系统
+
+> Android 的Build系统是基于GNU Make 和 Shell 构建的一套编译环境。
+>
+> Android的Build系统除了完成目标系统的二进制文件，APK应用程序的编译、链接、打包等工作外，还需要生成目标文件系统的景象以及各种配置文件，同时还要维护各个模块间的依赖关系，确保某个模块的修改能引起所依赖的文件重新编译。Android build 系统的功能非常强大，能同时支持多架构（x86,arm和mips）、多语言(汇编、c/c++、java)和多目标（同时支持多个产品）
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
