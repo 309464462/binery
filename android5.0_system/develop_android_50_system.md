@@ -20,6 +20,30 @@
 >
 > Android的Build系统除了完成目标系统的二进制文件，APK应用程序的编译、链接、打包等工作外，还需要生成目标文件系统的景象以及各种配置文件，同时还要维护各个模块间的依赖关系，确保某个模块的修改能引起所依赖的文件重新编译。Android build 系统的功能非常强大，能同时支持多架构（x86,arm和mips）、多语言(汇编、c/c++、java)和多目标（同时支持多个产品）
 
+> 从大的方面，Android的Build系统可以分为三大块：
+>
+> 1. 位于build/core目录下的文件，这是Android Build系统的框架和核心
+> 2. 位于device目录下的文件，存放着具体的产品的配置文件
+> 3. 各模块的编译文件：Android.mk
+
+2.1 Android Build系统核心
+
+通常 编译Android系统使用下面的命令
+
+```shell
+#.build/envsetup.sh
+#lunch
+#make
+```
+
+2.1.1 编译环境的建立
+
+1.  envsetup.sh 文件的作用
+
+   > 这个脚本会建立Android的编译环境。
+
+   
+
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
 ### 第四章 进程间通信--Android的Binder
