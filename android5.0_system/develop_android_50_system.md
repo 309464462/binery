@@ -42,7 +42,15 @@
 
    > 这个脚本会建立Android的编译环境。
 
-   
+   ![1533536544434](D:\mybook\book_principal_work\android5.0_system\img\1533536544434.png)
+
+  Build系统会在这里分别引入具体产品的配置文件 AndroidProduct.mk 和 BoardConfig.mk,以及各个模块的编译文件Android.mk
+
+- clang 目录下的config.mk也会和select.mk文件一样按照同样的规则包含进3个不同的mk文件
+- combo 目录下的这些 mk文件定义了GCC编译器的版本和参数。
+- clang目录下的mk文件则定义了LLVM编译器的clang的路劲和参数。
+
+
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
