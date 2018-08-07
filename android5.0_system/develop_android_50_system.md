@@ -30,7 +30,7 @@ typora-root-url: ./
 > 2. 位于device目录下的文件，存放着具体的产品的配置文件
 > 3. 各模块的编译文件：Android.mk
 
-2.1 Android Build系统核心
+#### 2.1 Android Build系统核心
 
 通常 编译Android系统使用下面的命令
 
@@ -40,7 +40,7 @@ typora-root-url: ./
 #make
 ```
 
-2.1.1 编译环境的建立
+##### 2.1.1 编译环境的建立
 
 1.  envsetup.sh 文件的作用
 
@@ -121,7 +121,7 @@ function add_lunch_combo()
 
 2. Lunch命令功能
 
-2.1.3 Build系统的层次关系
+##### 2.1.3 Build系统的层次关系
 
 > 设置好变量之后，接下来的make命令你就会开始执行编译工作。 make命令会调用 build目录下的Makefile文件，它的内容是：
 
@@ -138,6 +138,15 @@ makefile 主要包含了3种内容： 变量定义/函数定义/目标依赖规�
 - clang 目录下的config.mk也会和select.mk文件一样按照同样的规则包含进3个不同的mk文件
 - combo 目录下的这些 mk文件定义了GCC编译器的版本和参数。
 - clang目录下的mk文件则定义了LLVM编译器的clang的路劲和参数。
+
+![1533622320041](/img/1533622320041.png)
+
+##### 2.1.4 分析main文件
+
+ main.mk文件是Android Build系统的主控文件，分段解释如下.
+
+(1) 检查 gnu make的版本是否大于或等于3.8.1，否则报错并停止编译：
+
 
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
