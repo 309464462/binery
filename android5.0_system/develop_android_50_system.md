@@ -147,6 +147,98 @@ makefile 主要包含了3种内容： 变量定义/函数定义/目标依赖规�
 
 (1) 检查 gnu make的版本是否大于或等于3.8.1，否则报错并停止编译：
 
+```shell
+ifeq (,$(findstring CYGWIN,$(shell uname -sm)))  //判断如果不是window版本
+ifneq (1,$(strip $(shell expr $(MAKE_VERSION) \>= 3.81))) 
+$(warning ********************************************************************************)
+$(warning *  You are using version $(MAKE_VERSION) of make.)
+$(warning *  Android can only be built by versions 3.81 and higher.)
+$(warning *  see https://source.android.com/source/download.html)
+$(warning ********************************************************************************)
+$(error stopping)
+endif
+endif
+
+```
+
+(2) 定义缺省的编译目标为“droid”。因此，命令“make" 相当于”make droid“:
+
+```shell
+# This is the default target.  It must be the first declared target.
+.PHONY: droid
+DEFAULT_GOAL := droid
+$(DEFAULT_GOAL):
+```
+
+(3) 引入几个make文件。注意“-include”和“include” 的区别是：前者包含的文件如果不存在不会报错，后者则会报错并停止编译。
+
+```shell
+# Targets that provide quick help on the build system.
+include $(BUILD_SYSTEM)/help.mk
+
+# Set up various standard variables based on configuration
+# and host information.
+include $(BUILD_SYSTEM)/config.mk
+
+# This allows us to force a clean build - included after the config.mk
+# environment setup is done, but before we generate any dependencies.  This
+# file does the rm -rf inline so the deps which are all done below will
+# be generated correctly
+include $(BUILD_SYSTEM)/cleanbuild.mk
+
+# Include the google-specific config
+-include vendor/google/build/config.mk
+
+VERSION_CHECK_SEQUENCE_NUMBER := 5
+-include $(OUT_DIR)/versions_checked.mk
+```
+
+(4) 检查java的版本是否是1.7或者1.6 ，不是则会报错退出。如果java版本是1.7，在linux下要求必须是openjdk的版本，否则要求是Oracle的JDK版本：
+
+```shell
+java_version_str := $(shell unset _JAVA_OPTIONS && java -version 2>&1)
+javac_version_str := $(shell unset _JAVA_OPTIONS && javac -version 2>&1)
+
+# Check for the correct version of java, should be 1.7 by
+# default, and 1.6 if LEGACY_USE_JAVA6 is set.
+ifeq ($(LEGACY_USE_JAVA6),)
+required_version := "1.7.x"
+required_javac_version := "1.7"
+java_version := $(shell echo '$(java_version_str)' | grep '^java .*[ "]1\.7[\. "$$]')
+javac_version := $(shell echo '$(javac_version_str)' | grep '[ "]1\.7[\. "$$]')
+else # if LEGACY_USE_JAVA6
+required_version := "1.6.x"
+required_javac_version := "1.6"
+java_version := $(shell echo '$(java_version_str)' | grep '^java .*[ "]1\.6[\. "$$]')
+javac_version := $(shell echo '$(javac_version_str)' | grep '[ "]1\.6[\. "$$]')
+endif # if LEGACY_USE_JAVA6
+
+ifeq ($(strip $(java_version)),)
+$(info ************************************************************)
+$(info You are attempting to build with the incorrect version)
+$(info of java.)
+$(info $(space))
+$(info Your version is: $(java_version_str).)
+$(info The required version is: $(required_version))
+$(info $(space))
+$(info Please follow the machine setup instructions at)
+$(info $(space)$(space)$(space)$(space)https://source.android.com/source/initializing.html)
+$(info ************************************************************)
+$(error stop)
+endif
+
+# Check for the current JDK.
+#
+# For Java 1.7, we require OpenJDK on linux and Oracle JDK on Mac OS.
+# For Java 1.6, we require Oracle for all host OSes.
+requires_openjdk := false
+ifeq ($(LEGACY_USE_JAVA6),)
+ifeq ($(HOST_OS), linux)
+requires_openjdk := true
+endif
+endif
+```
+
 
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
