@@ -1,3 +1,7 @@
+---
+typora-root-url: ./
+---
+
 ### 第一章 建立Android系统开发环境
 
 #### 1.1 安装系统
@@ -127,9 +131,7 @@ include build/core/main.mk
 
 makefile 主要包含了3种内容： 变量定义/函数定义/目标依赖规则。
 
-
-
-   ![1533536544434](D:\mybook\book_principal_work\android5.0_system\img\1533536544434.png)
+![](E:\mybook\book_principal_work\android5.0_system\img\1533536544434.png)
 
   Build系统会在这里分别引入具体产品的配置文件 AndroidProduct.mk 和 BoardConfig.mk,以及各个模块的编译文件Android.mk
 
