@@ -40,9 +40,94 @@
 
 1.  envsetup.sh 文件的作用
 
-   > 这个脚本会建立Android的编译环境。
+   > 这个脚本会建立Android的编译环境。它会提供一些必要的指令
 
-   
+```shell
+- lunch:   lunch <product_name>-<build_variant>
+- tapas:   tapas [<App1> <App2> ...] [arm|x86|mips|armv5|arm64|x86_64|mips64] [eng|userdebug|user]
+- croot:   Changes directory to the top of the tree.
+- m:       Makes from the top of the tree.
+- mm:      Builds all of the modules in the current directory, but not their dependencies.
+- mmm:     Builds all of the modules in the supplied directories, but not their dependencies.
+           To limit the modules being built use the syntax: mmm dir/:target1,target2.
+- mma:     Builds all of the modules in the current directory, and their dependencies.
+- mmma:    Builds all of the modules in the supplied directories, and their dependencies.
+- cgrep:   Greps on all local C/C++ files.
+- ggrep:   Greps on all local Gradle files.
+- jgrep:   Greps on all local Java files.
+- resgrep: Greps on all local res/*.xml files.
+- sgrep:   Greps on all local source files.
+- godir:   Go to th
+```
+
+先看实际执行部分的代码
+
+```shell
+# add the default one here
+add_lunch_combo aosp_arm-eng
+add_lunch_combo aosp_arm64-eng
+add_lunch_combo aosp_mips-eng
+add_lunch_combo aosp_mips64-eng
+add_lunch_combo aosp_x86-eng
+add_lunch_combo aosp_x86_64-eng
+
+#结尾处，
+# Execute the contents of any vendorsetup.sh files we can find.
+#表示搜索所有vender device目录的 vendorsetup.sh 
+for f in `test -d device && find -L device -maxdepth 4 -name 'vendorsetup.sh' 2> /dev/null` \
+         `test -d vendor && find -L vendor -maxdepth 4 -name 'vendorsetup.sh' 2> /dev/null`
+do
+    echo "including $f"
+    #运行这些vendorsetup.sh文件
+    . $f
+done
+unset f
+```
+
+以华为的device/lge/hammerhead 设备为例
+
+查看vedorsetup.sh可以看到只有一句话，添加到变量中
+
+```shell
+add_lunch_combo aosp_hammerhead-userdebug
+```
+
+原函数为
+
+```shell
+unset LUNCH_MENU_CHOICES 
+##取消设置一个shell变量，从内存和shell的导出环境中删除它
+#shell支持一维数组（不支持多维数组），并且没有限定数组的大小。
+# 将调用该命令所传递参数存到一个全局的数组变量LUNCH_MENU_CHOICES
+function add_lunch_combo()
+{
+    local new_combo=$1
+    local c
+    ##使用@ 或 * 可以获取数组中的所有元素，
+    for c in ${LUNCH_MENU_CHOICES[@]} ; do
+        if [ "$new_combo" = "$c" ] ; then
+            return
+        fi
+    done
+    LUNCH_MENU_CHOICES=(${LUNCH_MENU_CHOICES[@]} $new_combo)
+}
+```
+
+![1533469089834](E:\mybook\book_principal_work\android5.0_system\ing\1533469089834.png)
+
+2. Lunch命令功能
+
+2.1.3 Build系统的层次关系
+
+> 设置好变量之后，接下来的make命令你就会开始执行编译工作。 make命令会调用 build目录下的Makefile文件，它的内容是：
+
+```
+include build/core/main.mk
+```
+
+makefile 主要包含了3种内容： 变量定义/函数定义/目标依赖规则。
+
+
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
