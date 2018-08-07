@@ -18,6 +18,8 @@
 
 del /a /f /s /q  "*.jpg" "*.json" 
 
+del /a /f /s /q  "*.pkf"  
+
 
 
 主业务流程不能有异常的情况出现，
