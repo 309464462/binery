@@ -161,14 +161,32 @@ endif
 
 ```
 
+> findstring In ,STR : 在str中查找IN，如果存在就返回IN
+>
+> strip :  为二进制文件去掉符号信息，只要结果
+>
+> expr $(MAKE_VERSION) \>= 3.81  //反斜杠是为避免被shell误解
+>
+> 
+
 (2) 定义缺省的编译目标为“droid”。因此，命令“make" 相当于”make droid“:
 
 ```shell
+PWD := $(shell pwd)
+
+TOP := .
+TOPDIR :=
+
+BUILD_SYSTEM := $(TOPDIR)build/core
 # This is the default target.  It must be the first declared target.
 .PHONY: droid
 DEFAULT_GOAL := droid
 $(DEFAULT_GOAL):
 ```
+
+> 拿clean举例，如果make完成后，自己另外定义一个名叫clean的文件，再执行make clean时，将不会执行rm命令。  　　
+>
+> 为了避免出现这个问题，需要.PHONY: clean 
 
 (3) 引入几个make文件。注意“-include”和“include” 的区别是：前者包含的文件如果不存在不会报错，后者则会报错并停止编译。
 
@@ -192,6 +210,48 @@ include $(BUILD_SYSTEM)/cleanbuild.mk
 VERSION_CHECK_SEQUENCE_NUMBER := 5
 -include $(OUT_DIR)/versions_checked.mk
 ```
+
+> $0		当前脚本的文件名
+>
+> $n		传递给脚本或函数的参数。n 是数字，表示第几个参数。例如，第一个是$1，第二个是$2。
+>
+> $#		传递给脚本或函数的参数个数。
+>
+> $*		传递给脚本或函数的所有参数。
+>
+> $@		传递给脚本或函数的所有参数。被双引号(" ")包含时，与 $* 稍有不同，下面将会讲到。
+>
+> $?		上个命令的退出状态，或函数的返回值。一般情况下，大部分命令执行成功会返回 0，失败返回 1。
+>
+> $$		当前Shell进程ID。对于 Shell 脚本，就是这些脚本所在的进程ID。
+>
+> $* 和 $@ 都表示传递给函数或脚本的所有参数，不被双引号(" ")包含时，都以"$1" "$2" … "$n" 的形式输出所有参数。
+>
+> 但是当它们被双引号(" ")包含时，"$*" 会将所有的参数作为一个整体，以"$1 $2 … $n"的形式输出所有参数；"$@" 会将各个参数分开，以"$1" "$2" … "$n" 的形式输出所有参数。
+>
+> $( ) 与 &apos;  (反引号) 都是用来做命令替换用 
+>
+>  file=/dir1/dir2/dir3/my.file.txt 
+>
+>  ${ } 分别替换获得不同的值： 
+>
+> ${file#*/}：拿掉第一条 / 及其左边的字符串dir1/dir2/dir3/my.file.txt*
+>
+> ${file##*/}：拿掉最后一条 / 及其左边的字符串：my.file.txt 
+>
+> ${file#*.}：拿掉第一个 .  及其左边的字符串：file.txt 
+>
+> ${file##*.}：拿掉最后一个 .  及其左边的字符串：txt 
+>
+> ${file%/*}：拿掉最后条 / 及其右边的字符串：/dir1/dir2/dir3  
+>
+> ${file%%/*}：拿掉第一条 / 及其右边的字符串：(空值) 
+>
+> ${file%.*}：拿掉最后一个 .  及其右边的字符串：/dir1/dir2/dir3/my.file 
+>
+> *${file%%.*}：拿掉第一个 .  及其右边的字符串：/dir1/dir2/dir3/my 
+>
+>  
 
 (4) 检查java的版本是否是1.7或者1.6 ，不是则会报错退出。如果java版本是1.7，在linux下要求必须是openjdk的版本，否则要求是Oracle的JDK版本：
 
@@ -237,6 +297,598 @@ ifeq ($(HOST_OS), linux)
 requires_openjdk := true
 endif
 endif
+```
+
+> '='就是赋值运算
+>
+>  ':='就是当冒号前面的变量不存在或值为空时，就把等号后的值赋值给变量 
+>
+> '+='这个应该不用解释吧，和C中一样，变量等于本身和另一个变量的和
+>
+>  '?='它的意思是在语句 a?b 中如果a未定义则用b替换a 
+
+（5）将变量 VERSION_CHECKED和BUILD_EMULATOR写入文件 out/version_checked.mk。 下次build的时候就会重新包含这个文件：
+
+```shell
+ifndef BUILD_EMULATOR
+  # Emulator binaries are now provided under prebuilts/android-emulator/
+  BUILD_EMULATOR := false
+endif
+
+$(shell echo 'VERSIONS_CHECKED := $(VERSION_CHECK_SEQUENCE_NUMBER)' \
+        > $(OUT_DIR)/versions_checked.mk)
+$(shell echo 'BUILD_EMULATOR ?= $(BUILD_EMULATOR)' \
+        >> $(OUT_DIR)/versions_checked.mk)
+endif
+
+```
+
+（6）再包含3个文件
+
+```shell
+
+# Bring in standard build system definitions.
+include $(BUILD_SYSTEM)/definitions.mk
+
+# Bring in dex_preopt.mk
+include $(BUILD_SYSTEM)/dex_preopt.mk
+
+ifneq ($(filter user userdebug eng,$(MAKECMDGOALS)),)
+$(info ***************************************************************)
+$(info ***************************************************************)
+$(info Do not pass '$(filter user userdebug eng,$(MAKECMDGOALS))' on \
+       the make command line.)
+$(info Set TARGET_BUILD_VARIANT in buildspec.mk, or use lunch or)
+$(info choosecombo.)
+$(info ***************************************************************)
+$(info ***************************************************************)
+$(error stopping)
+endif
+
+ifneq ($(filter-out $(INTERNAL_VALID_VARIANTS),$(TARGET_BUILD_VARIANT)),)
+$(info ***************************************************************)
+$(info ***************************************************************)
+$(info Invalid variant: $(TARGET_BUILD_VARIANT)
+$(info Valid values are: $(INTERNAL_VALID_VARIANTS)
+$(info ***************************************************************)
+$(info ***************************************************************)
+$(error stopping)
+endif
+
+# -----------------------------------------------------------------
+# Variable to check java support level inside PDK build.
+# Not necessary if the components is not in PDK.
+# not defined : not supported
+# "sdk" : sdk API only
+# "platform" : platform API supproted
+TARGET_BUILD_JAVA_SUPPORT_LEVEL := platform
+
+# -----------------------------------------------------------------
+# The pdk (Platform Development Kit) build
+include build/core/pdk_config.mk
+```
+
+(7) 如果变量ONE_SHOT_MAKEFILE的值不为空，将它定义的文件包含进来。当编一个单独模块，ONE_SHOT_MAKEFILE 的值会设为模块的make文件路径。如果值ONE_SHOT_MAKEFILE 为空，说明再编译整个文件系统，因此，调用findleaves.py 脚本搜索系统里所有的Android.mk文件并将它们包含进来。
+
+```shell
+
+ifneq ($(ONE_SHOT_MAKEFILE),)
+# We've probably been invoked by the "mm" shell function
+# with a subdirectory's makefile.
+include $(ONE_SHOT_MAKEFILE)
+# Change CUSTOM_MODULES to include only modules that were
+# defined by this makefile; this will install all of those
+# modules as a side-effect.  Do this after including ONE_SHOT_MAKEFILE
+# so that the modules will be installed in the same place they
+# would have been with a normal make.
+CUSTOM_MODULES := $(sort $(call get-tagged-modules,$(ALL_MODULE_TAGS)))
+FULL_BUILD :=
+# Stub out the notice targets, which probably aren't defined
+# when using ONE_SHOT_MAKEFILE.
+NOTICE-HOST-%: ;
+NOTICE-TARGET-%: ;
+
+# A helper goal printing out install paths
+.PHONY: GET-INSTALL-PATH
+GET-INSTALL-PATH:
+	@$(foreach m, $(ALL_MODULES), $(if $(ALL_MODULES.$(m).INSTALLED), \
+		echo 'INSTALL-PATH: $(m) $(ALL_MODULES.$(m).INSTALLED)';))
+
+else # ONE_SHOT_MAKEFILE
+
+ifneq ($(dont_bother),true)
+#
+# Include all of the makefiles in the system
+#
+
+# Can't use first-makefiles-under here because
+# --mindepth=2 makes the prunes not work.
+subdir_makefiles := \
+	$(shell build/tools/findleaves.py --prune=$(OUT_DIR) --prune=.repo --prune=.git $(subdirs) Android.mk)
+
+$(foreach mk, $(subdir_makefiles), $(info including $(mk) ...)$(eval include $(mk)))
+
+endif # dont_bother
+
+endif # ONE_SHOT_MAKEFILE
+```
+
+> eval 的作用是再次执行命令行处理,也就是说,对一个命令行,执行两次命令行处理。 
+
+（8）根据类型来设置属性ro.secure的值
+
+```shell
+
+## user/userdebug ##
+
+user_variant := $(filter user userdebug,$(TARGET_BUILD_VARIANT))
+enable_target_debugging := true
+tags_to_install :=
+ifneq (,$(user_variant))
+  # Target is secure in user builds.
+  ADDITIONAL_DEFAULT_PROPERTIES += ro.secure=1
+
+  ifeq ($(user_variant),userdebug)
+    # Pick up some extra useful tools
+    tags_to_install += debug
+
+    # Enable Dalvik lock contention logging for userdebug builds.
+    ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.lockprof.threshold=500
+  else
+    # Disable debugging in plain user builds.
+    enable_target_debugging :=
+  endif
+
+  # Turn on Dalvik preoptimization for libdvm.so user builds, but only if not
+  # explicitly disabled and the build is running on Linux (since host
+  # Dalvik isn't built for non-Linux hosts).
+  ifeq (,$(WITH_DEXPREOPT))
+    ifeq ($(DALVIK_VM_LIB),libdvm.so)
+      ifeq ($(user_variant),user)
+        ifeq ($(HOST_OS),linux)
+          WITH_DEXPREOPT := true
+        endif
+      endif
+    endif
+  endif
+
+  # Disallow mock locations by default for user builds
+  ADDITIONAL_DEFAULT_PROPERTIES += ro.allow.mock.location=0
+
+else # !user_variant
+  # Turn on checkjni for non-user builds.
+  ADDITIONAL_BUILD_PROPERTIES += ro.kernel.android.checkjni=1
+  # Set device insecure for non-user builds.
+  ADDITIONAL_DEFAULT_PROPERTIES += ro.secure=0
+  # Allow mock locations by default for non user builds
+  ADDITIONAL_DEFAULT_PROPERTIES += ro.allow.mock.location=1
+endif # !user_variant
+
+ifeq (true,$(strip $(enable_target_debugging)))
+  # Target is more debuggable and adbd is on by default
+  ADDITIONAL_DEFAULT_PROPERTIES += ro.debuggable=1
+  # Include the debugging/testing OTA keys in this build.
+  INCLUDE_TEST_OTA_KEYS := true
+else # !enable_target_debugging
+  # Target is less debuggable and adbd is off by default
+  ADDITIONAL_DEFAULT_PROPERTIES += ro.debuggable=0
+endif # !enable_target_debugging
+
+## eng ##
+
+ifeq ($(TARGET_BUILD_VARIANT),eng)
+tags_to_install := debug eng
+ifneq ($(filter ro.setupwizard.mode=ENABLED, $(call collapse-pairs, $(ADDITIONAL_BUILD_PROPERTIES))),)
+  # Don't require the setup wizard on eng builds
+  ADDITIONAL_BUILD_PROPERTIES := $(filter-out ro.setupwizard.mode=%,\
+          $(call collapse-pairs, $(ADDITIONAL_BUILD_PROPERTIES))) \
+          ro.setupwizard.mode=OPTIONAL
+endif
+ifndef is_sdk_build
+  # Don't even verify the image on eng builds to speed startup
+  ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.image-dex2oat-filter=verify-none
+  # Don't compile apps on eng builds to speed startup
+  ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.dex2oat-filter=interpret-only
+endif
+endif
+
+## sdk ##
+```
+
+（9） 包含进 post_clean.mk和legacypre_builts.mk脚本。根据legacypre_builts.mk中定义的变量GRANDFATHERED_ALL_PREBUILT 检查是否有不在这个列表中的prebuilt模块。如果有则报错推出。
+
+```shell
+# Now with all Android.mks loaded we can do post cleaning steps.
+include $(BUILD_SYSTEM)/post_clean.mk
+
+ifeq ($(stash_product_vars),true)
+  $(call assert-product-vars, __STASHED)
+endif
+
+include $(BUILD_SYSTEM)/legacy_prebuilts.mk
+ifneq ($(filter-out $(GRANDFATHERED_ALL_PREBUILT),$(strip $(notdir $(ALL_PREBUILT)))),)
+  $(warning *** Some files have been added to ALL_PREBUILT.)
+  $(warning *)
+  $(warning * ALL_PREBUILT is a deprecated mechanism that)
+  $(warning * should not be used for new files.)
+  $(warning * As an alternative, use PRODUCT_COPY_FILES in)
+  $(warning * the appropriate product definition.)
+  $(warning * build/target/product/core.mk is the product)
+  $(warning * definition used in all products.)
+  $(warning *)
+  $(foreach bad_prebuilt,$(filter-out $(GRANDFATHERED_ALL_PREBUILT),$(strip $(notdir $(ALL_PREBUILT)))),$(warning * unexpected $(bad_prebuilt) in ALL_PREBUILT))
+  $(warning *)
+  $(error ALL_PREBUILT contains unexpected files)
+endif
+
+```
+
+设置系统如果没响应，跟踪文件的路径
+
+```shell
+# enable vm tracing in files for now to help track
+# the cause of ANRs in the content process
+ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.stack-trace-file=/data/anr/traces.txt
+```
+
+（10）计算那些模块应该在本次编译中引入：
+
+```shell
+# -------------------------------------------------------------------
+# Fix up CUSTOM_MODULES to refer to installed files rather than
+# just bare module names.  Leave unknown modules alone in case
+# they're actually full paths to a particular file.
+known_custom_modules := $(filter $(ALL_MODULES),$(CUSTOM_MODULES))
+unknown_custom_modules := $(filter-out $(ALL_MODULES),$(CUSTOM_MODULES))
+CUSTOM_MODULES := \
+	$(call module-installed-files,$(known_custom_modules)) \
+	$(unknown_custom_modules)
+
+# -------------------------------------------------------------------
+# Define dependencies for modules that require other modules.
+# This can only happen now, after we've read in all module makefiles.
+#
+# TODO: deal with the fact that a bare module name isn't
+# unambiguous enough.  Maybe declare short targets like
+# APPS:Quake or HOST:SHARED_LIBRARIES:libutils.
+# BUG: the system image won't know to depend on modules that are
+# brought in as requirements of other modules.
+#
+# Resolve the required module name to 32-bit or 64-bit variant.
+# Get a list of corresponding 32-bit module names, if one exists.
+define get-32-bit-modules
+$(strip $(foreach m,$(1),\
+  $(if $(ALL_MODULES.$(m)$(TARGET_2ND_ARCH_MODULE_SUFFIX).CLASS),\
+    $(m)$(TARGET_2ND_ARCH_MODULE_SUFFIX))))
+endef
+# Get a list of corresponding 32-bit module names, if one exists;
+# otherwise return the original module name
+define get-32-bit-modules-if-we-can
+$(strip $(foreach m,$(1),\
+  $(if $(ALL_MODULES.$(m)$(TARGET_2ND_ARCH_MODULE_SUFFIX).CLASS),\
+    $(m)$(TARGET_2ND_ARCH_MODULE_SUFFIX),
+    $(m))))
+endef
+
+# If a module is built for 32-bit, the required modules must be 32-bit too;
+# Otherwise if the module is an exectuable or shared library,
+#   the required modules must be 64-bit;
+#   otherwise we require both 64-bit and 32-bit variant, if one exists.
+$(foreach m,$(ALL_MODULES),\
+  $(eval r := $(ALL_MODULES.$(m).REQUIRED))\
+  $(if $(r),\
+    $(if $(ALL_MODULES.$(m).FOR_2ND_ARCH),\
+      $(eval r_r := $(call get-32-bit-modules-if-we-can,$(r))),\
+      $(if $(filter EXECUTABLES SHARED_LIBRARIES,$(ALL_MODULES.$(m).CLASS)),\
+        $(eval r_r := $(r)),\
+        $(eval r_r := $(r) $(call get-32-bit-modules,$(r)))\
+       )\
+     )\
+     $(eval ALL_MODULES.$(m).REQUIRED := $(strip $(r_r)))\
+  )\
+)
+r_r :=
+
+define add-required-deps
+$(1): | $(2)
+endef
+
+$(foreach m,$(ALL_MODULES), \
+  $(eval r := $(ALL_MODULES.$(m).REQUIRED)) \
+  $(if $(r), \
+    $(eval r := $(call module-installed-files,$(r))) \
+    $(eval t_m := $(filter $(TARGET_OUT_ROOT)/%, $(ALL_MODULES.$(m).INSTALLED))) \
+    $(eval h_m := $(filter $(HOST_OUT_ROOT)/%, $(ALL_MODULES.$(m).INSTALLED))) \
+    $(eval t_r := $(filter $(TARGET_OUT_ROOT)/%, $(r))) \
+    $(eval h_r := $(filter $(HOST_OUT_ROOT)/%, $(r))) \
+    $(eval t_m := $(filter-out $(t_r), $(t_m))) \
+    $(eval h_m := $(filter-out $(h_r), $(h_m))) \
+    $(if $(t_m), $(eval $(call add-required-deps, $(t_m),$(t_r)))) \
+    $(if $(h_m), $(eval $(call add-required-deps, $(h_m),$(h_r)))) \
+   ) \
+ )
+
+t_m :=
+h_m :=
+t_r :=
+h_r :=
+
+```
+
+（11） 包含makefile文件，至此，所有编译文件都包含进来了。
+
+```shell
+# build/core/Makefile contains extra stuff that we don't want to pollute this
+# top-level makefile with.  It expects that ALL_DEFAULT_INSTALLED_MODULES
+# contains everything that's built during the current make, but it also further
+# extends ALL_DEFAULT_INSTALLED_MODULES.
+ALL_DEFAULT_INSTALLED_MODULES := $(modules_to_install)
+include $(BUILD_SYSTEM)/Makefile
+modules_to_install := $(sort $(ALL_DEFAULT_INSTALLED_MODULES))
+ALL_DEFAULT_INSTALLED_MODULES :=
+```
+
+（12）定义系统的编译目标，鉴于内容太多，就不详细列举了，
+
+```shell
+# -------------------------------------------------------------------
+# This is used to to get the ordering right, you can also use these,
+# but they're considered undocumented, so don't complain if their
+# behavior changes.
+.PHONY: prebuilt
+prebuilt: $(ALL_PREBUILT)
+
+# An internal target that depends on all copied headers
+# (see copy_headers.make).  Other targets that need the
+# headers to be copied first can depend on this target.
+.PHONY: all_copied_headers
+all_copied_headers: ;
+
+$(ALL_C_CPP_ETC_OBJECTS): | all_copied_headers
+
+# All the droid stuff, in directories
+.PHONY: files
+files: prebuilt \
+        $(modules_to_install) \
+        $(INSTALLED_ANDROID_INFO_TXT_TARGET)
+
+# -------------------------------------------------------------------
+
+.PHONY: checkbuild
+checkbuild: $(modules_to_check)
+ifeq (true,$(ANDROID_BUILD_EVERYTHING_BY_DEFAULT)$(filter $(MAKECMDGOALS),checkbuild))
+droid: checkbuild
+else
+# ANDROID_BUILD_EVERYTHING_BY_DEFAULT not set, or checkbuild is one of the cmd goals.
+checkbuild: droid
+endif
+
+.PHONY: ramdisk
+ramdisk: $(INSTALLED_RAMDISK_TARGET)
+
+.PHONY: factory_ramdisk
+factory_ramdisk: $(INSTALLED_FACTORY_RAMDISK_TARGET)
+
+.PHONY: factory_bundle
+factory_bundle: $(INSTALLED_FACTORY_BUNDLE_TARGET)
+
+.PHONY: systemtarball
+systemtarball: $(INSTALLED_SYSTEMTARBALL_TARGET)
+
+.PHONY: boottarball
+boottarball: $(INSTALLED_BOOTTARBALL_TARGET)
+
+.PHONY: userdataimage
+userdataimage: $(INSTALLED_USERDATAIMAGE_TARGET)
+
+ifneq (,$(filter userdataimage, $(MAKECMDGOALS)))
+$(call dist-for-goals, userdataimage, $(BUILT_USERDATAIMAGE_TARGET))
+endif
+
+.PHONY: userdatatarball
+userdatatarball: $(INSTALLED_USERDATATARBALL_TARGET)
+
+.PHONY: cacheimage
+cacheimage: $(INSTALLED_CACHEIMAGE_TARGET)
+
+.PHONY: vendorimage
+vendorimage: $(INSTALLED_VENDORIMAGE_TARGET)
+
+.PHONY: bootimage
+bootimage: $(INSTALLED_BOOTIMAGE_TARGET)
+
+# phony target that include any targets in $(ALL_MODULES)
+.PHONY: all_modules
+ifndef BUILD_MODULES_IN_PATHS
+all_modules: $(ALL_MODULES)
+else
+# BUILD_MODULES_IN_PATHS is a list of paths relative to the top of the tree
+module_path_patterns := $(foreach p, $(BUILD_MODULES_IN_PATHS),\
+    $(if $(filter %/,$(p)),$(p)%,$(p)/%))
+my_all_modules := $(sort $(foreach m, $(ALL_MODULES),$(if $(filter\
+    $(module_path_patterns), $(addsuffix /,$(ALL_MODULES.$(m).PATH))),$(m))))
+all_modules: $(my_all_modules)
+endif
+
+
+# Build files and then package it into the rom formats
+.PHONY: droidcore
+droidcore: files \
+	systemimage \
+	$(INSTALLED_BOOTIMAGE_TARGET) \
+	$(INSTALLED_RECOVERYIMAGE_TARGET) \
+	$(INSTALLED_USERDATAIMAGE_TARGET) \
+	$(INSTALLED_CACHEIMAGE_TARGET) \
+	$(INSTALLED_VENDORIMAGE_TARGET) \
+	$(INSTALLED_FILES_FILE)
+
+# dist_files only for putting your library into the dist directory with a full build.
+.PHONY: dist_files
+
+ifneq ($(TARGET_BUILD_APPS),)
+  # If this build is just for apps, only build apps and not the full system by default.
+
+  unbundled_build_modules :=
+  ifneq ($(filter all,$(TARGET_BUILD_APPS)),)
+    # If they used the magic goal "all" then build all apps in the source tree.
+    unbundled_build_modules := $(foreach m,$(sort $(ALL_MODULES)),$(if $(filter APPS,$(ALL_MODULES.$(m).CLASS)),$(m)))
+  else
+    unbundled_build_modules := $(TARGET_BUILD_APPS)
+  endif
+
+  # Dist the installed files if they exist.
+  apps_only_installed_files := $(foreach m,$(unbundled_build_modules),$(ALL_MODULES.$(m).INSTALLED))
+  $(call dist-for-goals,apps_only, $(apps_only_installed_files))
+  # For uninstallable modules such as static Java library, we have to dist the built file,
+  # as <module_name>.<suffix>
+  apps_only_dist_built_files := $(foreach m,$(unbundled_build_modules),$(if $(ALL_MODULES.$(m).INSTALLED),,\
+      $(if $(ALL_MODULES.$(m).BUILT),$(ALL_MODULES.$(m).BUILT):$(m)$(suffix $(ALL_MODULES.$(m).BUILT)))))
+  $(call dist-for-goals,apps_only, $(apps_only_dist_built_files))
+
+  ifeq ($(EMMA_INSTRUMENT),true)
+    $(EMMA_META_ZIP) : $(apps_only_installed_files)
+
+    $(call dist-for-goals,apps_only, $(EMMA_META_ZIP))
+  endif
+
+  $(PROGUARD_DICT_ZIP) : $(apps_only_installed_files)
+  $(call dist-for-goals,apps_only, $(PROGUARD_DICT_ZIP))
+
+  $(SYMBOLS_ZIP) : $(apps_only_installed_files)
+  $(call dist-for-goals,apps_only, $(SYMBOLS_ZIP))
+
+.PHONY: apps_only
+apps_only: $(unbundled_build_modules)
+
+droid: apps_only
+
+# Combine the NOTICE files for a apps_only build
+$(eval $(call combine-notice-files, \
+    $(target_notice_file_txt), \
+    $(target_notice_file_html), \
+    "Notices for files for apps:", \
+    $(TARGET_OUT_NOTICE_FILES), \
+    $(apps_only_installed_files)))
+
+
+else # TARGET_BUILD_APPS
+  $(call dist-for-goals, droidcore, \
+    $(INTERNAL_UPDATE_PACKAGE_TARGET) \
+    $(INTERNAL_OTA_PACKAGE_TARGET) \
+    $(SYMBOLS_ZIP) \
+    $(INSTALLED_FILES_FILE) \
+    $(INSTALLED_BUILD_PROP_TARGET) \
+    $(BUILT_TARGET_FILES_PACKAGE) \
+    $(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+    $(INSTALLED_RAMDISK_TARGET) \
+    $(INSTALLED_FACTORY_RAMDISK_TARGET) \
+    $(INSTALLED_FACTORY_BUNDLE_TARGET) \
+   )
+
+  # Put a copy of the radio/bootloader files in the dist dir.
+  $(foreach f,$(INSTALLED_RADIOIMAGE_TARGET), \
+    $(call dist-for-goals, droidcore, $(f)))
+
+  ifneq ($(ANDROID_BUILD_EMBEDDED),true)
+  ifneq ($(TARGET_BUILD_PDK),true)
+    $(call dist-for-goals, droidcore, \
+      $(APPS_ZIP) \
+      $(INTERNAL_EMULATOR_PACKAGE_TARGET) \
+      $(PACKAGE_STATS_FILE) \
+    )
+  endif
+  endif
+
+  ifeq ($(EMMA_INSTRUMENT),true)
+    $(EMMA_META_ZIP) : $(INSTALLED_SYSTEMIMAGE)
+
+    $(call dist-for-goals, dist_files, $(EMMA_META_ZIP))
+  endif
+
+# Building a full system-- the default is to build droidcore
+droid: droidcore dist_files
+
+endif # TARGET_BUILD_APPS
+
+.PHONY: docs
+docs: $(ALL_DOCS)
+
+.PHONY: sdk
+ALL_SDK_TARGETS := $(INTERNAL_SDK_TARGET)
+sdk: $(ALL_SDK_TARGETS)
+$(call dist-for-goals,sdk win_sdk, \
+    $(ALL_SDK_TARGETS) \
+    $(SYMBOLS_ZIP) \
+    $(INSTALLED_BUILD_PROP_TARGET) \
+)
+
+# umbrella targets to assit engineers in verifying builds
+.PHONY: java native target host java-host java-target native-host native-target \
+        java-host-tests java-target-tests native-host-tests native-target-tests \
+        java-tests native-tests host-tests target-tests tests
+# some synonyms
+.PHONY: host-java target-java host-native target-native \
+        target-java-tests target-native-tests
+host-java : java-host
+target-java : java-target
+host-native : native-host
+target-native : native-target
+target-java-tests : java-target-tests
+target-native-tests : native-target-tests
+tests : host-tests target-tests
+
+# To catch more build breakage, check build tests modules in eng and userdebug builds.
+ifneq ($(TARGET_BUILD_PDK),true)
+ifneq ($(filter eng userdebug,$(TARGET_BUILD_VARIANT)),)
+droidcore : target-tests host-tests
+endif
+endif
+
+.PHONY: lintall
+
+ifneq (,$(filter samplecode, $(MAKECMDGOALS)))
+.PHONY: samplecode
+sample_MODULES := $(sort $(call get-tagged-modules,samples))
+sample_APKS_DEST_PATH := $(TARGET_COMMON_OUT_ROOT)/samples
+sample_APKS_COLLECTION := \
+        $(foreach module,$(sample_MODULES),$(sample_APKS_DEST_PATH)/$(notdir $(module)))
+$(foreach module,$(sample_MODULES),$(eval $(call \
+        copy-one-file,$(module),$(sample_APKS_DEST_PATH)/$(notdir $(module)))))
+sample_ADDITIONAL_INSTALLED := \
+        $(filter-out $(modules_to_install) $(modules_to_check) $(ALL_PREBUILT),$(sample_MODULES))
+samplecode: $(sample_APKS_COLLECTION)
+	@echo "Collect sample code apks: $^"
+	# remove apks that are not intended to be installed.
+	rm -f $(sample_ADDITIONAL_INSTALLED)
+endif  # samplecode in $(MAKECMDGOALS)
+
+.PHONY: findbugs
+findbugs: $(INTERNAL_FINDBUGS_HTML_TARGET) $(INTERNAL_FINDBUGS_XML_TARGET)
+
+.PHONY: clean
+clean:
+	@rm -rf $(OUT_DIR)/*
+	@echo "Entire build directory removed."
+
+.PHONY: clobber
+clobber: clean
+
+# The rules for dataclean and installclean are defined in cleanbuild.mk.
+
+#xxx scrape this from ALL_MODULE_NAME_TAGS
+.PHONY: modules
+modules:
+	@echo "Available sub-modules:"
+	@echo "$(call module-names-for-tag-list,$(ALL_MODULE_TAGS))" | \
+	      tr -s ' ' '\n' | sort -u | $(COLUMN)
+
+.PHONY: showcommands
+showcommands:
+	@echo >/dev/null
+
+.PHONY: nothing
+nothing:
+	@echo Successfully read the makefiles.
 ```
 
 
