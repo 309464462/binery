@@ -1310,6 +1310,254 @@ include $(BUILD_SYSTEM)/dumpvar.mk
 
 product_config.mk文件分段如下。
 
+（1） 编译Android时可以实用lunch命令制定所需要编译的设备，但这不是编译系统唯一的方法。我们可以直接在make命令之后通过参数来指定需要编译的产品。因此，这里首先解析make命令的参数$(MAKECMDGOALS)，格式是PRODUCT-<prodname>-<goal>,相当于设置了变量TARGET_PRODUCT为<prodname>、变量TARGET_BUILD_VARIANT设置为<goal>
+
+```shell
+# ---------------------------------------------------------------
+# Provide "PRODUCT-<prodname>-<goal>" targets, which lets you build
+# a particular configuration without needing to set up the environment.
+#
+product_goals := $(strip $(filter PRODUCT-%,$(MAKECMDGOALS)))
+ifdef product_goals
+  # Scrape the product and build names out of the goal,
+  # which should be of the form PRODUCT-<productname>-<buildname>.
+  #
+  ifneq ($(words $(product_goals)),1)
+    $(error Only one PRODUCT-* goal may be specified; saw "$(product_goals)")
+  endif
+  goal_name := $(product_goals)
+  product_goals := $(patsubst PRODUCT-%,%,$(product_goals))
+  product_goals := $(subst -, ,$(product_goals))
+  ifneq ($(words $(product_goals)),2)
+    $(error Bad PRODUCT-* goal "$(goal_name)")
+  endif
+
+  # The product they want
+  TARGET_PRODUCT := $(word 1,$(product_goals))
+
+  # The variant they want
+  TARGET_BUILD_VARIANT := $(word 2,$(product_goals))
+
+  ifeq ($(TARGET_BUILD_VARIANT),tests)
+    $(error "tests" has been deprecated as a build variant. Use it as a build goal instead.)
+  endif
+
+  # The build server wants to do make PRODUCT-dream-installclean
+  # which really means TARGET_PRODUCT=dream make installclean.
+  ifneq ($(filter-out $(INTERNAL_VALID_VARIANTS),$(TARGET_BUILD_VARIANT)),)
+    MAKECMDGOALS := $(MAKECMDGOALS) $(TARGET_BUILD_VARIANT)
+    TARGET_BUILD_VARIANT := eng
+    default_goal_substitution :=
+  else
+    default_goal_substitution := $(DEFAULT_GOAL)
+  endif
+
+  # Replace the PRODUCT-* goal with the build goal that it refers to.
+  # Note that this will ensure that it appears in the same relative
+  # position, in case it matters.
+  #
+  # Note that modifying this will not affect the goals that make will
+  # attempt to build, but it's important because we inspect this value
+  # in certain situations (like for "make sdk").
+  #
+  MAKECMDGOALS := $(patsubst $(goal_name),$(default_goal_substitution),$(MAKECMDGOALS))
+
+  # Define a rule for the PRODUCT-* goal, and make it depend on the
+  # patched-up command-line goals as well as any other goals that we
+  # want to force.
+  #
+.PHONY: $(goal_name)
+$(goal_name): $(MAKECMDGOALS)
+endif
+# else: Use the value set in the environment or buildspec.mk.
+
+
+```
+
+（2） 如果make命令的参数格式是APP-<appname>，则相当于设置变量TARGET_BUILD_APPS为<appname>。这将导致系统编译某个App模块，而不是某个产品。
+
+```shell
+# ---------------------------------------------------------------
+# Provide "APP-<appname>" targets, which lets you build
+# an unbundled app.
+#
+unbundled_goals := $(strip $(filter APP-%,$(MAKECMDGOALS)))
+ifdef unbundled_goals
+  ifneq ($(words $(unbundled_goals)),1)
+    $(error Only one APP-* goal may be specified; saw "$(unbundled_goals)"))
+  endif
+  TARGET_BUILD_APPS := $(strip $(subst -, ,$(patsubst APP-%,%,$(unbundled_goals))))
+  ifneq ($(filter $(DEFAULT_GOAL),$(MAKECMDGOALS)),)
+    MAKECMDGOALS := $(patsubst $(unbundled_goals),,$(MAKECMDGOALS))
+  else
+    MAKECMDGOALS := $(patsubst $(unbundled_goals),$(DEFAULT_GOAL),$(MAKECMDGOALS))
+  endif
+
+.PHONY: $(unbundled_goals)
+$(unbundled_goals): $(MAKECMDGOALS)
+endif # unbundled_goals
+
+# Default to building dalvikvm on hosts that support it...
+ifeq ($(HOST_OS),linux)
+# ... or if the if the option is already set
+ifeq ($(WITH_HOST_DALVIK),)
+  WITH_HOST_DALVIK := true
+endif
+endif
+
+
+```
+
+（3）包含进3个文件：node_fns.mk、product.mk、device.mk：
+
+```shell
+# ---------------------------------------------------------------
+# Include the product definitions.
+# We need to do this to translate TARGET_PRODUCT into its
+# underlying TARGET_DEVICE before we start defining any rules.
+#
+include $(BUILD_SYSTEM)/node_fns.mk
+include $(BUILD_SYSTEM)/product.mk
+include $(BUILD_SYSTEM)/device.mk
+
+
+```
+
+（4）执行$(get-all-product-makefiles)函数
+
+```shell
+ifneq ($(strip $(TARGET_BUILD_APPS)),)
+# An unbundled app build needs only the core product makefiles.
+all_product_configs := $(call get-product-makefiles,\
+    $(SRC_TARGET_DIR)/product/AndroidProducts.mk)
+else
+# Read in all of the product definitions specified by the AndroidProducts.mk
+# files in the tree.
+all_product_configs := $(get-all-product-makefiles)
+endif
+
+```
+
+get-all-product-makefiles函数的定义位于文件product.mk中，这个函数会查找vendor和device目录下所有AndroidProducts.mk文件，打开并读取其中PRODUCT_MAKEFILES变量的值，后面会介绍这个变量的作用。
+
+下面是product.mk中的定义
+
+```shell
+#
+# Returns the list of all AndroidProducts.mk files.
+# $(call ) isn't necessary.
+#
+define _find-android-products-files
+$(shell test -d device && find device -maxdepth 6 -name AndroidProducts.mk) \
+  $(shell test -d vendor && find vendor -maxdepth 6 -name AndroidProducts.mk) \
+  $(SRC_TARGET_DIR)/product/AndroidProducts.mk
+endef
+
+#
+# Returns the sorted concatenation of PRODUCT_MAKEFILES
+# variables set in the given AndroidProducts.mk files.
+# $(1): the list of AndroidProducts.mk files.
+#
+define get-product-makefiles
+$(sort \
+  $(foreach f,$(1), \
+    $(eval PRODUCT_MAKEFILES :=) \
+    $(eval LOCAL_DIR := $(patsubst %/,%,$(dir $(f)))) \
+    $(eval include $(f)) \
+    $(PRODUCT_MAKEFILES) \
+   ) \
+  $(eval PRODUCT_MAKEFILES :=) \
+  $(eval LOCAL_DIR :=) \
+ )
+endef
+
+#
+# Returns the sorted concatenation of all PRODUCT_MAKEFILES
+# variables set in all AndroidProducts.mk files.
+# $(call ) isn't necessary.
+#
+define get-all-product-makefiles
+$(call get-product-makefiles,$(_find-android-products-files))
+endef
+
+```
+
+（5）下面是对current_product_makefile 和all_product_makefiles 两个变量赋值。all_product_makefiles 变量的内容是系统中所产生的配置。current_product_makefile 是当前产品的配置路径。对all_product_makefiles 的赋值是将all_product_configs变量的内容几乎全部复制过来。而对current_product_makefile的赋值则根据$(TARGET_PRODUCT) 的值进行匹配。假如编译师用lunch命令选择了aosp_hammerhead，那么这里current_product_makefile 的值就是 device/lge/hammerhead.mk
+
+```shell
+
+# Find the product config makefile for the current product.
+# all_product_configs consists items like:
+# <product_name>:<path_to_the_product_makefile>
+# or just <path_to_the_product_makefile> in case the product name is the
+# same as the base filename of the product config makefile.
+current_product_makefile :=
+all_product_makefiles :=
+
+$(foreach f, $(all_product_configs),\
+    $(eval _cpm_words := $(subst :,$(space),$(f)))\
+    $(eval _cpm_word1 := $(word 1,$(_cpm_words)))\
+    $(eval _cpm_word2 := $(word 2,$(_cpm_words)))\
+    $(if $(_cpm_word2),\
+        $(eval all_product_makefiles += $(_cpm_word2))\
+        $(if $(filter $(TARGET_PRODUCT),$(_cpm_word1)),\
+            $(eval current_product_makefile += $(_cpm_word2)),),\
+        $(eval all_product_makefiles += $(f))\
+        $(if $(filter $(TARGET_PRODUCT),$(basename $(notdir $(f)))),\
+            $(eval current_product_makefile += $(f)),)))
+_cpm_words :=
+_cpm_word1 :=
+_cpm_word2 :=
+current_product_makefile := $(strip $(current_product_makefile))
+all_product_makefiles := $(strip $(all_product_makefiles))
+
+
+
+```
+
+（6）如果make后跟有参数"product-graph" 或者“dump-products”，就会调用
+
+$(call import-products, $(all_product_makefiles))，否则只会执行$(call import-products, $(current_product_makefile))：
+
+```shell
+
+ifneq (,$(filter product-graph dump-products, $(MAKECMDGOALS)))
+# Import all product makefiles.
+$(call import-products, $(all_product_makefiles))
+else
+# Import just the current product.
+ifndef current_product_makefile
+$(error Can not locate config makefile for product "$(TARGET_PRODUCT)")
+endif
+ifneq (1,$(words $(current_product_makefile)))
+$(error Product "$(TARGET_PRODUCT)" ambiguous: matches $(current_product_makefile))
+endif
+$(call import-products, $(current_product_makefile))
+endif  # Import all or just the current product makefile
+```
+
+（7）上一步import的结果是产生如PRODUCT.$(TARGET_PRODUCT).xxx的一系列内部变量，然后将它们的值赋予产品相关的变量，例如
+
+```shell
+# A list of module names of BOOTCLASSPATH (jar files)
+PRODUCT_BOOT_JARS := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_BOOT_JARS))
+PRODUCT_SYSTEM_SERVER_JARS := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SYSTEM_SERVER_JARS))
+
+# Find the device that this product maps to.
+TARGET_DEVICE := $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_DEVICE)
+
+# Figure out which resoure configuration options to use for this
+# product.
+PRODUCT_LOCALES := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_LOCALES))
+# TODO: also keep track of things like "port", "land" in product files.
+
+
+```
+
+理解一个内部变量的办法就是搜索Build系统中所有对该变量赋值和使用的地方，看看系统如何使用这个变量，就能比较精确的掌握这个变量的含义。
+
+
+
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
 ### 第四章 进程间通信--Android的Binder
