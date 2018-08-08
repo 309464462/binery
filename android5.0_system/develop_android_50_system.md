@@ -933,9 +933,382 @@ files: prebuilt \
 
 ##### 2.1.6 分析config.mk文件
 
-> 接下来，在看看config.mk文件
+> 接下来，在看看config.mk文件，这个文件相当于Build系统的配置文件。
+
+(1) 定义表示文档、头文件、系统库的源码目录等变量，方便其他编译脚本使用
+
+```shell
+# Standard source directories.
+SRC_DOCS:= $(TOPDIR)docs
+# TODO: Enforce some kind of layering; only add include paths
+#       when a module links against a particular library.
+# TODO: See if we can remove most of these from the global list.
+SRC_HEADERS := \
+        $(TOPDIR)system/core/include \
+        $(TOPDIR)hardware/libhardware/include \
+        $(TOPDIR)hardware/libhardware_legacy/include \
+        $(TOPDIR)hardware/ril/include \
+        $(TOPDIR)libnativehelper/include \
+        $(TOPDIR)frameworks/native/include \
+        $(TOPDIR)frameworks/native/opengl/include \
+        $(TOPDIR)frameworks/av/include \
+        $(TOPDIR)frameworks/base/include
+SRC_HOST_HEADERS:=$(TOPDIR)tools/include
+SRC_LIBRARIES:= $(TOPDIR)libs
+SRC_SERVERS:= $(TOPDIR)servers
+SRC_TARGET_DIR := $(TOPDIR)build/target
+SRC_API_DIR := $(TOPDIR)prebuilts/sdk/api
+SRC_SYSTEM_API_DIR := $(TOPDIR)prebuilts/sdk/system-api
+
+# Some specific paths to tools
+SRC_DROIDDOC_DIR := $(TOPDIR)build/tools/droiddoc
+
+```
+
+(2) 包含pathmap.mk文件
+
+```shell
+# Various mappings to avoid hard-coding paths all over the place
+include $(BUILD_SYSTEM)/pathmap.mk
+```
+
+(3) 定义模块编译变量名，这里的模块是指编译出的apk文件，静态java库，共享Java库等。这些变量会用在这些模块的编译脚本中，各个模块编译脚本的结尾都会include下面一个变量名，这将包含进某个系统的编译脚本：
+
+```shell
+# Build system internal files
+# ###############################################################
+
+BUILD_COMBOS:= $(BUILD_SYSTEM)/combo
+
+CLEAR_VARS:= $(BUILD_SYSTEM)/clear_vars.mk
+BUILD_HOST_STATIC_LIBRARY:= $(BUILD_SYSTEM)/host_static_library.mk
+BUILD_HOST_SHARED_LIBRARY:= $(BUILD_SYSTEM)/host_shared_library.mk
+BUILD_STATIC_LIBRARY:= $(BUILD_SYSTEM)/static_library.mk
+BUILD_RAW_STATIC_LIBRARY := $(BUILD_SYSTEM)/raw_static_library.mk
+BUILD_SHARED_LIBRARY:= $(BUILD_SYSTEM)/shared_library.mk
+BUILD_EXECUTABLE:= $(BUILD_SYSTEM)/executable.mk
+BUILD_RAW_EXECUTABLE:= $(BUILD_SYSTEM)/raw_executable.mk
+BUILD_HOST_EXECUTABLE:= $(BUILD_SYSTEM)/host_executable.mk
+BUILD_PACKAGE:= $(BUILD_SYSTEM)/package.mk
+BUILD_PHONY_PACKAGE:= $(BUILD_SYSTEM)/phony_package.mk
+BUILD_HOST_PREBUILT:= $(BUILD_SYSTEM)/host_prebuilt.mk
+BUILD_PREBUILT:= $(BUILD_SYSTEM)/prebuilt.mk
+BUILD_MULTI_PREBUILT:= $(BUILD_SYSTEM)/multi_prebuilt.mk
+BUILD_JAVA_LIBRARY:= $(BUILD_SYSTEM)/java_library.mk
+BUILD_STATIC_JAVA_LIBRARY:= $(BUILD_SYSTEM)/static_java_library.mk
+BUILD_HOST_JAVA_LIBRARY:= $(BUILD_SYSTEM)/host_java_library.mk
+BUILD_DROIDDOC:= $(BUILD_SYSTEM)/droiddoc.mk
+BUILD_COPY_HEADERS := $(BUILD_SYSTEM)/copy_headers.mk
+BUILD_NATIVE_TEST := $(BUILD_SYSTEM)/native_test.mk
+BUILD_HOST_NATIVE_TEST := $(BUILD_SYSTEM)/host_native_test.mk
+
+BUILD_SHARED_TEST_LIBRARY := $(BUILD_SYSTEM)/shared_test_lib.mk
+BUILD_HOST_SHARED_TEST_LIBRARY := $(BUILD_SYSTEM)/host_shared_test_lib.mk
+BUILD_STATIC_TEST_LIBRARY := $(BUILD_SYSTEM)/static_test_lib.mk
+BUILD_HOST_STATIC_TEST_LIBRARY := $(BUILD_SYSTEM)/host_static_test_lib.mk
+
+BUILD_NOTICE_FILE := $(BUILD_SYSTEM)/notice_files.mk
+BUILD_HOST_DALVIK_JAVA_LIBRARY := $(BUILD_SYSTEM)/host_dalvik_java_library.mk
+BUILD_HOST_DALVIK_STATIC_JAVA_LIBRARY := $(BUILD_SYSTEM)/host_dalvik_static_java_library.mk
 
 
+```
+
+在某些5.0系统版本中，还会配置dalvik虚拟机的动态库
+
+![1533719327526](/img/1533719327526.png)
+
+(4) 定义c/c++代码编译时的参数以及系统常用包的后缀名：
+
+```shell
+
+# ###############################################################
+# Set common values
+# ###############################################################
+
+# These can be changed to modify both host and device modules.
+COMMON_GLOBAL_CFLAGS:= -DANDROID -fmessage-length=0 -W -Wall -Wno-unused -Winit-self -Wpointer-arith
+COMMON_RELEASE_CFLAGS:= -DNDEBUG -UDEBUG
+
+COMMON_GLOBAL_CPPFLAGS:= $(COMMON_GLOBAL_CFLAGS) -Wsign-promo
+COMMON_RELEASE_CPPFLAGS:= $(COMMON_RELEASE_CFLAGS)
+
+# Set the extensions used for various packages
+COMMON_PACKAGE_SUFFIX := .zip
+COMMON_JAVA_PACKAGE_SUFFIX := .jar
+COMMON_ANDROID_PACKAGE_SUFFIX := .apk
+
+# list of flags to turn specific warnings in to errors
+TARGET_ERROR_FLAGS := -Werror=return-type -Werror=non-virtual-dtor -Werror=address -Werror=sequence-point
+
+# TODO: do symbol compression
+TARGET_COMPRESS_MODULE_SYMBOLS := false
+
+
+# Only use ANDROID_BUILD_SHELL to wrap around bash.
+# DO NOT use other shells such as zsh.
+ifdef ANDROID_BUILD_SHELL
+SHELL := $(ANDROID_BUILD_SHELL)
+else
+# Use bash, not whatever shell somebody has installed as /bin/sh
+# This is repeated from main.mk, since envsetup.sh runs this file
+# directly.
+SHELL := /bin/bash
+endif
+```
+
+(5) 如果在源码根目录下有buildspec.mk文件，包含进来：
+
+```shell
+ifndef ANDROID_BUILDSPEC
+ANDROID_BUILDSPEC := $(TOPDIR)buildspec.mk
+endif
+-include $(ANDROID_BUILDSPEC)
+
+```
+
+(6) 包含envsetup.sh文件
+
+```shell
+include $(BUILD_SYSTEM)/envsetup.mk
+```
+
+(7) 包含select.mk文件。注意这里一共包含了4次，但是每次包含前会对变量
+
+
+
+```shell
+
+# $(1): os/arch
+define select-android-config-h
+build/core/combo/include/arch/$(1)/AndroidConfig.h
+endef
+
+combo_target := HOST_
+combo_2nd_arch_prefix :=
+include $(BUILD_SYSTEM)/combo/select.mk
+
+# Load the 2nd host arch if it's needed.
+ifdef HOST_2ND_ARCH
+combo_target := HOST_
+combo_2nd_arch_prefix := $(HOST_2ND_ARCH_VAR_PREFIX)
+include $(BUILD_SYSTEM)/combo/select.mk
+endif
+
+# on windows, the tools have .exe at the end, and we depend on the
+# host config stuff being done first
+
+combo_target := TARGET_
+combo_2nd_arch_prefix :=
+include $(BUILD_SYSTEM)/combo/select.mk
+
+# Load the 2nd target arch if it's needed.
+ifdef TARGET_2ND_ARCH
+combo_target := TARGET_
+combo_2nd_arch_prefix := $(TARGET_2ND_ARCH_VAR_PREFIX)
+include $(BUILD_SYSTEM)/combo/select.mk
+endif
+
+ifdef TARGET_PREFER_32_BIT
+TARGET_PREFER_32_BIT_APPS := true
+TARGET_PREFER_32_BIT_EXECUTABLES := true
+endif
+
+ifeq (,$(TARGET_SUPPORTS_32_BIT_APPS)$(TARGET_SUPPORTS_64_BIT_APPS))
+  TARGET_SUPPORTS_32_BIT_APPS := true
+endif
+
+```
+
+(8) 包含javac.mk文件，这个文件定义了Java编译工具的路劲
+
+```shell
+# Pick a Java compiler.
+include $(BUILD_SYSTEM)/combo/javac.mk
+```
+
+(9) 定义Build系统使用的一些工具的路径
+
+```shell
+# ---------------------------------------------------------------
+# Generic tools.
+
+LEX := prebuilts/misc/$(BUILD_OS)-$(HOST_PREBUILT_ARCH)/flex/flex-2.5.39
+# The default PKGDATADIR built in the prebuilt bison is a relative path
+# external/bison/data.
+# To run bison from elsewhere you need to set up enviromental variable
+# BISON_PKGDATADIR.
+BISON_PKGDATADIR := $(PWD)/external/bison/data
+BISON := prebuilts/misc/$(BUILD_OS)-$(HOST_PREBUILT_ARCH)/bison/bison
+YACC := $(BISON) -d
+
+YASM := prebuilts/misc/$(BUILD_OS)-$(HOST_PREBUILT_ARCH)/yasm/yasm
+
+DOXYGEN:= doxygen
+AAPT := $(HOST_OUT_EXECUTABLES)/aapt$(HOST_EXECUTABLE_SUFFIX)
+AIDL := $(HOST_OUT_EXECUTABLES)/aidl$(HOST_EXECUTABLE_SUFFIX)
+PROTOC := $(HOST_OUT_EXECUTABLES)/aprotoc$(HOST_EXECUTABLE_SUFFIX)
+SIGNAPK_JAR := $(HOST_OUT_JAVA_LIBRARIES)/signapk$(COMMON_JAVA_PACKAGE_SUFFIX)
+MKBOOTFS := $(HOST_OUT_EXECUTABLES)/mkbootfs$(HOST_EXECUTABLE_SUFFIX)
+MINIGZIP := $(HOST_OUT_EXECUTABLES)/minigzip$(HOST_EXECUTABLE_SUFFIX)
+ifeq (,$(strip $(BOARD_CUSTOM_MKBOOTIMG)))
+MKBOOTIMG := $(HOST_OUT_EXECUTABLES)/mkbootimg$(HOST_EXECUTABLE_SUFFIX)
+else
+MKBOOTIMG := $(BOARD_CUSTOM_MKBOOTIMG)
+endif
+MKYAFFS2 := $(HOST_OUT_EXECUTABLES)/mkyaffs2image$(HOST_EXECUTABLE_SUFFIX)
+APICHECK := $(HOST_OUT_EXECUTABLES)/apicheck$(HOST_EXECUTABLE_SUFFIX)
+FS_GET_STATS := $(HOST_OUT_EXECUTABLES)/fs_get_stats$(HOST_EXECUTABLE_SUFFIX)
+MKEXT2IMG := $(HOST_OUT_EXECUTABLES)/genext2fs$(HOST_EXECUTABLE_SUFFIX)
+MAKE_EXT4FS := $(HOST_OUT_EXECUTABLES)/make_ext4fs$(HOST_EXECUTABLE_SUFFIX)
+MKEXTUSERIMG := $(HOST_OUT_EXECUTABLES)/mkuserimg.sh
+MAKE_F2FS := $(HOST_OUT_EXECUTABLES)/make_f2fs$(HOST_EXECUTABLE_SUFFIX)
+MKF2FSUSERIMG := $(HOST_OUT_EXECUTABLES)/mkf2fsuserimg.sh
+MKEXT2BOOTIMG := external/genext2fs/mkbootimg_ext2.sh
+SIMG2IMG := $(HOST_OUT_EXECUTABLES)/simg2img$(HOST_EXECUTABLE_SUFFIX)
+E2FSCK := $(HOST_OUT_EXECUTABLES)/e2fsck$(HOST_EXECUTABLE_SUFFIX)
+MKTARBALL := build/tools/mktarball.sh
+TUNE2FS := $(HOST_OUT_EXECUTABLES)/tune2fs$(HOST_EXECUTABLE_SUFFIX)
+E2FSCK := $(HOST_OUT_EXECUTABLES)/e2fsck$(HOST_EXECUTABLE_SUFFIX)
+JARJAR := $(HOST_OUT_JAVA_LIBRARIES)/jarjar.jar
+PROGUARD := external/proguard/bin/proguard.sh
+JAVATAGS := build/tools/java-event-log-tags.py
+LLVM_RS_CC := $(HOST_OUT_EXECUTABLES)/llvm-rs-cc$(HOST_EXECUTABLE_SUFFIX)
+BCC_COMPAT := $(HOST_OUT_EXECUTABLES)/bcc_compat$(HOST_EXECUTABLE_SUFFIX)
+LINT := prebuilts/sdk/tools/lint
+RMTYPEDEFS := $(HOST_OUT_EXECUTABLES)/rmtypedefs
+APPEND2SIMG := $(HOST_OUT_EXECUTABLES)/append2simg
+VERITY_SIGNER := $(HOST_OUT_EXECUTABLES)/verity_signer
+BUILD_VERITY_TREE := $(HOST_OUT_EXECUTABLES)/build_verity_tree
+BOOT_SIGNER := $(HOST_OUT_EXECUTABLES)/boot_signer
+
+# ACP is always for the build OS, not for the host OS
+ACP := $(BUILD_OUT_EXECUTABLES)/acp$(BUILD_EXECUTABLE_SUFFIX)
+
+# dx is java behind a shell script; no .exe necessary.
+DX := $(HOST_OUT_EXECUTABLES)/dx
+ZIPALIGN := $(HOST_OUT_EXECUTABLES)/zipalign$(HOST_EXECUTABLE_SUFFIX)
+FINDBUGS_DIR := external/owasp/sanitizer/tools/findbugs/bin
+FINDBUGS := $(FINDBUGS_DIR)/findbugs
+EMMA_JAR := external/emma/lib/emma$(COMMON_JAVA_PACKAGE_SUFFIX)
+
+# Tool to merge AndroidManifest.xmls
+ANDROID_MANIFEST_MERGER := java -classpath prebuilts/devtools/tools/lib/manifest-merger.jar com.android.manifmerger.Main merge
+
+YACC_HEADER_SUFFIX:= .hpp
+
+# Don't use column under Windows, cygwin or not
+ifeq ($(HOST_OS),windows)
+COLUMN:= cat
+else
+COLUMN:= column
+endif
+
+ifeq ($(HOST_OS),darwin)
+ifeq ($(LEGACY_USE_JAVA6),)
+HOST_JDK_TOOLS_JAR:= $(shell $(BUILD_SYSTEM)/find-jdk-tools-jar.sh)
+else
+# Deliberately set to blank for Java 6 installations on MacOS. These
+# versions allegedly use a non-standard directory structure.
+HOST_JDK_TOOLS_JAR :=
+endif
+else
+HOST_JDK_TOOLS_JAR:= $(shell $(BUILD_SYSTEM)/find-jdk-tools-jar.sh)
+endif
+
+ifneq ($(HOST_JDK_TOOLS_JAR),)
+ifeq ($(wildcard $(HOST_JDK_TOOLS_JAR)),)
+$(error Error: could not find jdk tools.jar, please check if your JDK was installed correctly)
+endif
+endif
+
+# Is the host JDK 64-bit version?
+HOST_JDK_IS_64BIT_VERSION :=
+ifneq ($(filter 64-Bit, $(shell java -version 2>&1)),)
+HOST_JDK_IS_64BIT_VERSION := true
+endif
+
+# It's called md5 on Mac OS and md5sum on Linux
+ifeq ($(HOST_OS),darwin)
+MD5SUM:=md5 -q
+else
+MD5SUM:=md5sum
+endif
+
+```
+
+> lex和yacc可以帮助你编写程序转换结构化输入。既包括从输入文件中寻找模式的简单文本搜索程序，也包括将源程序变换为最佳的目标代码的C编译程序等。 
+
+(10) 定义host平台和target平台各自编译，链接c/c++使用的参数。下面是第一个，当然还有其他候选的一些默认设置：
+
+```shell
+
+# ###############################################################
+# Set up final options.
+# ###############################################################
+
+HOST_GLOBAL_CFLAGS += $(COMMON_GLOBAL_CFLAGS)
+HOST_RELEASE_CFLAGS += $(COMMON_RELEASE_CFLAGS)
+
+HOST_GLOBAL_CPPFLAGS += $(COMMON_GLOBAL_CPPFLAGS)
+HOST_RELEASE_CPPFLAGS += $(COMMON_RELEASE_CPPFLAGS)
+
+TARGET_GLOBAL_CFLAGS += $(COMMON_GLOBAL_CFLAGS)
+TARGET_RELEASE_CFLAGS += $(COMMON_RELEASE_CFLAGS)
+
+TARGET_GLOBAL_CPPFLAGS += $(COMMON_GLOBAL_CPPFLAGS)
+TARGET_RELEASE_CPPFLAGS += $(COMMON_RELEASE_CPPFLAGS)
+
+HOST_GLOBAL_LD_DIRS += -L$(HOST_OUT_INTERMEDIATE_LIBRARIES)
+TARGET_GLOBAL_LD_DIRS += -L$(TARGET_OUT_INTERMEDIATE_LIBRARIES)
+
+HOST_PROJECT_INCLUDES:= $(SRC_HEADERS) $(SRC_HOST_HEADERS) $(HOST_OUT_HEADERS)
+TARGET_PROJECT_INCLUDES:= $(SRC_HEADERS) $(TARGET_OUT_HEADERS) \
+                $(TARGET_DEVICE_KERNEL_HEADERS) $(TARGET_BOARD_KERNEL_HEADERS) \
+                $(TARGET_PRODUCT_KERNEL_HEADERS)
+
+# Many host compilers don't support these flags, so we have to make
+# sure to only specify them for the target compilers checked in to
+# the source tree.
+TARGET_GLOBAL_CFLAGS += $(TARGET_ERROR_FLAGS)
+TARGET_GLOBAL_CPPFLAGS += $(TARGET_ERROR_FLAGS)
+
+HOST_GLOBAL_CFLAGS += $(HOST_RELEASE_CFLAGS)
+HOST_GLOBAL_CPPFLAGS += $(HOST_RELEASE_CPPFLAGS)
+
+TARGET_GLOBAL_CFLAGS += $(TARGET_RELEASE_CFLAGS)
+TARGET_GLOBAL_CPPFLAGS += $(TARGET_RELEASE_CPPFLAGS)
+
+```
+
+(11) 包含clang/config.mk文件。这个文件定义了llvm编译器clang的路径和参数
+
+```shell
+# define clang/llvm tools and global flags
+include $(BUILD_SYSTEM)/clang/config.mk
+```
+
+(12) 定义 Andoid SDK的版本：
+
+```shell
+
+TARGET_AVAILABLE_SDK_VERSIONS := $(call numerically_sort,\
+    $(patsubst $(HISTORICAL_SDK_VERSIONS_ROOT)/%/android.jar,%, \
+    $(wildcard $(HISTORICAL_SDK_VERSIONS_ROOT)/*/android.jar)))
+
+# We don't have prebuilt system_current SDK yet.
+TARGET_AVAILABLE_SDK_VERSIONS := $(TARGET_AVAILABLE_SDK_VERSIONS)
+```
+
+(13) 包含dumpvar.mk文件，打印出本次编译产品的配置信息：
+
+```shell
+include $(BUILD_SYSTEM)/dumpvar.mk
+```
+
+##### 2.1.7分析product_config.mk文件
+
+product_config.mk文件分段如下。
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
