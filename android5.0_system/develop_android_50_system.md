@@ -891,6 +891,50 @@ nothing:
 	@echo Successfully read the makefiles.
 ```
 
+##### 2.15 Build 系统的编译目标介绍
+
+ Android Build系统的缺省编译目标是droid。droid目标会依赖其他目标，所有这些目标共同组成了最终的产品。
+
+下面是droid的目标定义
+
+```shell
+# This is used to to get the ordering right, you can also use these,
+# but they're considered undocumented, so don't complain if their
+# behavior changes.
+.PHONY: prebuilt
+prebuilt: $(ALL_PREBUILT)
+
+# Build files and then package it into the rom formats
+.PHONY: droidcore
+droidcore: files \
+	systemimage \
+	$(INSTALLED_BOOTIMAGE_TARGET) \
+	$(INSTALLED_RECOVERYIMAGE_TARGET) \
+	$(INSTALLED_USERDATAIMAGE_TARGET) \
+	$(INSTALLED_CACHEIMAGE_TARGET) \
+	$(INSTALLED_VENDORIMAGE_TARGET) \
+	$(INSTALLED_FILES_FILE)
+# dist_files only for putting your library into the dist directory with a full build.
+.PHONY: dist_files
+	
+# Building a full system-- the default is to build droidcore
+droid: droidcore dist_files
+# All the droid stuff, in directories
+.PHONY: files
+files: prebuilt \
+        $(modules_to_install) \
+        $(INSTALLED_ANDROID_INFO_TXT_TARGET)
+	
+```
+
+![1533712945811](/img/1533712945811.png)
+
+![1533713394294](/img/1533713394294.png)
+
+##### 2.1.6 分析config.mk文件
+
+> 接下来，在看看config.mk文件
+
 
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
