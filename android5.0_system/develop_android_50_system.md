@@ -1691,6 +1691,598 @@ vendorsetup.sh文件会在初始化编译环境时被eventsetup.sh文件包含�
 
 ​	产品的编译类型有3种：eng、user和userdebug。
 
+##### 2.AndroidProduct.mk
+
+AndroidProduct.mk会在Build系统的ProductConfig.mk文件中被包含进来，这个文件最重要的作用是定义了一个变量PRODUCT_MAKEFILES，它定义了本配置目录中的所有编译入口文件，但是，每种产品编译时只会使用其中之一。例如harmerhead中
+
+```shell
+
+PRODUCT_MAKEFILES := \
+    $(LOCAL_DIR)/aosp_hammerhead.mk \
+    $(LOCAL_DIR)/full_hammerhead.mk \
+    $(LOCAL_DIR)/car_hammerhead.mk
+
+```
+
+vendorsetup.sh 添加到列表中的是aosp_hammerhead，因此，实际能选用的文件只有aosp_hammerhead.mk。如果希望full_harmerhead.mk文件能够被选用，可以在vendorsetup.sh添加多一行
+
+> add_lunch_combo full_hammerhead-userdebug
+
+##### 3 BoardConfig.mk
+
+BoardConfig.mk文件被Build系统的envsetup.sh文件包含进去。这个文件主要定义了和设备硬件(包括CPU/WIF/GPS)相关的一些参数。看懂的这个文件的关键是理解文件中使用的编译变量。这个文件比较长，。
+
+```shell
+#
+# Copyright (C) 2013 The Android Open-Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+TARGET_CPU_ABI := armeabi-v7a	#表示cpu的编程界面
+TARGET_CPU_ABI2 := armeabi	 	#表示cpu的编程界面
+TARGET_CPU_SMP := true			#表示cpu是否为多核
+TARGET_ARCH := arm				#定义cpu架构
+TARGET_ARCH_VARIANT := armv7-a-neon	#定义cpu架构的版本
+TARGET_CPU_VARIANT := krait			#定义cpu的代号
+
+TARGET_NO_BOOTLOADER := true	#如果该变量定义为true，表示image文件不包含bootloader
+
+BOARD_KERNEL_BASE := 0x00000000	#装载kernel镜像时的基地址
+BOARD_KERNEL_PAGESIZE := 2048	#kernel镜像的分页大小
+
+BOARD_KERNEL_CMDLINE := console=ttyHSL0,115200,n8 androidboot.hardware=hammerhead user_debug=31 maxcpus=2 msm_watchdog_v2.enable=1  #装载kernel时传给kernel的命令行参数
+BOARD_MKBOOTIMG_ARGS := --ramdisk_offset 0x02900000 --tags_offset 0x02700000 #使用mkbootimg工具生成boot.img时的参数
+
+# Shader cache config options
+# Maximum size of the  GLES Shaders that can be cached for reuse.
+# Increase the size if shaders of size greater than 12KB are used.
+MAX_EGL_CACHE_KEY_SIZE := 12*1024 #渲染缓存设置
+
+# Maximum GLES shader cache size for each app to store the compiled shader
+# binaries. Decrease the size if RAM or Flash Storage size is a limitation
+# of the device.
+MAX_EGL_CACHE_SIZE := 2048*1024   
+
+BOARD_USES_ALSA_AUDIO := true #值为true，表示主板的声音系统使用ALSA架构
+
+BOARD_HAVE_BLUETOOTH := true	#值为true，表示主板支持蓝牙
+BOARD_HAVE_BLUETOOTH_BCM := true	#true表示主板使用的时broadcom的蓝牙芯片
+
+ifeq ($(TARGET_PRODUCT),car_hammerhead)
+BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := device/lge/hammerhead/bluetooth_car 
+else
+BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := device/lge/hammerhead/bluetooth
+endif
+
+# Wifi related defines
+WPA_SUPPLICANT_VERSION      := VER_0_8_X	#定义WiFi WPA的版本
+BOARD_WLAN_DEVICE           := bcmdhd 		＃定义WIFI设备名称
+BOARD_WPA_SUPPLICANT_DRIVER := NL80211		＃定义WIFI支持的驱动
+BOARD_WPA_SUPPLICANT_PRIVATE_LIB := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
+BOARD_HOSTAPD_DRIVER        := NL80211
+BOARD_HOSTAPD_PRIVATE_LIB   := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
+WIFI_DRIVER_FW_PATH_PARAM   := "/sys/module/bcmdhd/parameters/firmware_path" #指定wifi驱动的参数路径
+WIFI_DRIVER_FW_PATH_AP      := "/vendor/firmware/fw_bcmdhd_apsta.bin" #定义wifi热点fireware文件的路径
+WIFI_DRIVER_FW_PATH_STA     := "/vendor/firmware/fw_bcmdhd.bin" #也是固件路劲
+
+BOARD_USES_SECURE_SERVICES := true  #true，表示安全服务
+
+TARGET_NO_RADIOIMAGE := true   #true，表示编译的镜像中没有射频部分
+TARGET_BOARD_PLATFORM := msm8974	#表示主板平台的型号
+TARGET_BOOTLOADER_BOARD_NAME := hammerhead	#表示启动引导程序的名字
+TARGET_BOARD_INFO_FILE := device/lge/hammerhead/board-info.txt   #这个文件包含主板的要求。
+BOARD_VENDOR_QCOM_GPS_LOC_API_HARDWARE := $(TARGET_BOARD_PLATFORM) 
+TARGET_NO_RPC := true  #关闭远程程序调用接口
+
+BOARD_EGL_CFG := device/lge/hammerhead/egl.cfg   #opengl的设置
+
+USE_OPENGL_RENDERER := true
+VSYNC_EVENT_PHASE_OFFSET_NS := 7500000
+SF_VSYNC_EVENT_PHASE_OFFSET_NS := 5000000
+TARGET_USES_ION := true
+
+# Enable dex-preoptimization to speed up first boot sequence
+ifeq ($(HOST_OS),linux)
+  ifeq ($(TARGET_BUILD_VARIANT),user)
+    ifeq ($(WITH_DEXPREOPT),)
+      WITH_DEXPREOPT := true
+    endif
+  endif
+endif
+DONT_DEXPREOPT_PREBUILTS := true
+
+TARGET_USERIMAGES_USE_EXT4 := true #true，表示目标文件系统采用ext4格式。
+BOARD_BOOTIMAGE_PARTITION_SIZE := 23068672
+BOARD_RECOVERYIMAGE_PARTITION_SIZE := 23068672
+BOARD_SYSTEMIMAGE_PARTITION_SIZE := 1073741824
+BOARD_USERDATAIMAGE_PARTITION_SIZE := 13725837312
+BOARD_CACHEIMAGE_PARTITION_SIZE := 734003200
+BOARD_CACHEIMAGE_FILE_SYSTEM_TYPE := ext4
+BOARD_FLASH_BLOCK_SIZE := 131072
+
+BOARD_CHARGER_ENABLE_SUSPEND := true
+
+TARGET_RECOVERY_FSTAB = device/lge/hammerhead/fstab.hammerhead
+
+TARGET_RELEASETOOLS_EXTENSIONS := device/lge/hammerhead
+
+BOARD_HAL_STATIC_LIBRARIES := libdumpstate.hammerhead
+
+BOARD_SEPOLICY_DIRS += \
+       device/lge/hammerhead/sepolicy
+
+# The list below is order dependent
+BOARD_SEPOLICY_UNION += \
+       app.te \
+       bluetooth_loader.te \
+       bridge.te \
+       camera.te \
+       device.te \
+       domain.te \
+       file.te \
+       hostapd.te \
+       irsc_util.te \
+       mediaserver.te \
+       mpdecision.te \
+       netmgrd.te \
+       platform_app.te \
+       qmux.te \
+       radio.te \
+       rild.te \
+       rmt.te \
+       sensors.te \
+       ssr.te \
+       surfaceflinger.te \
+       system_server.te \
+       tee.te \
+       thermald.te \
+       time.te \
+       ueventd.te \
+       vss.te \
+       wpa.te \
+       file_contexts \
+       genfs_contexts \
+       te_macros
+
+HAVE_ADRENO_SOURCE:= false
+
+OVERRIDE_RS_DRIVER:= libRSDriver_adreno.so
+TARGET_FORCE_HWC_FOR_VIRTUAL_DISPLAYS := true
+
+TARGET_TOUCHBOOST_FREQUENCY:= 1200
+
+USE_DEVICE_SPECIFIC_QCOM_PROPRIETARY:= true
+USE_DEVICE_SPECIFIC_CAMERA:= true
+
+-include vendor/lge/hammerhead/BoardConfigVendor.mk
+
+# Enable Minikin text layout engine (will be the default soon)
+USE_MINIKIN := true
+
+# Include an expanded selection of fonts
+EXTENDED_FONT_FOOTPRINT := true
+```
+
+在harmerhead目录下还有几个文件和Build相关。
+
+1 aosp_hammerhead.mk
+
+```shell
+$(call inherit-product, device/lge/hammerhead/full_hammerhead.mk)
+
+PRODUCT_NAME := aosp_hammerhead  #修改产品的名字
+
+PRODUCT_PACKAGES += \		#添加一个模块
+    Launcher3
+
+```
+
+2 full_hammerhead.mk
+
+```shell
+$(call inherit-product, $(SRC_TARGET_DIR)/product/aosp_base_telephony.mk)
+
+PRODUCT_NAME := full_hammerhead			#产品名称
+PRODUCT_DEVICE := hammerhead			#产品的设备名称，
+PRODUCT_BRAND := Android				#产品的品牌，
+PRODUCT_MODEL := AOSP on HammerHead		#产品的型号
+PRODUCT_MANUFACTURER := LGE				#产品制造商
+PRODUCT_RESTRICT_VENDOR_FILES := true
+
+$(call inherit-product, device/lge/hammerhead/device.mk) 
+#这里开始包含vendor下的文件，vendor下存放的是从手机提取的HAL库和驱动文件。
+$(call inherit-product-if-exists, vendor/lge/hammerhead/device-vendor.mk)
+
+```
+
+3 device.mk
+
+device.mk是产品配置里经常要修改的一个文件。产品定义中需要包含进的模块，文件以及各种环境变量的定义一般都放在这个文件里面。device.mk的文件比较大，重复项也比较多。下面是完整的文件
+
+```shell
+
+ifeq ($(TARGET_PREBUILT_KERNEL),)
+ifeq ($(USE_SVELTE_KERNEL),true)
+LOCAL_KERNEL := device/lge/hammerhead_svelte-kernel/zImage-dtb
+else
+LOCAL_KERNEL := device/lge/hammerhead-kernel/zImage-dtb
+endif
+else
+LOCAL_KERNEL := $(TARGET_PREBUILT_KERNEL)
+endif
+
+
+PRODUCT_COPY_FILES := \
+    $(LOCAL_KERNEL):kernel
+
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/init.hammerhead.rc:root/init.hammerhead.rc \
+    device/lge/hammerhead/init.hammerhead.usb.rc:root/init.hammerhead.usb.rc \
+    device/lge/hammerhead/fstab.hammerhead:root/fstab.hammerhead \
+    device/lge/hammerhead/ueventd.hammerhead.rc:root/ueventd.hammerhead.rc
+
+# Input device files for hammerhead
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/gpio-keys.kl:system/usr/keylayout/gpio-keys.kl \
+    device/lge/hammerhead/gpio-keys.kcm:system/usr/keychars/gpio-keys.kcm \
+    device/lge/hammerhead/qpnp_pon.kl:system/usr/keylayout/qpnp_pon.kl \
+    device/lge/hammerhead/qpnp_pon.kcm:system/usr/keychars/qpnp_pon.kcm \
+    device/lge/hammerhead/Button_Jack.kl:system/usr/keylayout/msm8974-taiko-mtp-snd-card_Button_Jack.kl \
+    device/lge/hammerhead/Button_Jack.kcm:system/usr/keychars/msm8974-taiko-mtp-snd-card_Button_Jack.kcm \
+    device/lge/hammerhead/hs_detect.kl:system/usr/keylayout/hs_detect.kl \
+    device/lge/hammerhead/hs_detect.kcm:system/usr/keychars/hs_detect.kcm
+
+# Prebuilt input device calibration files
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/touch_dev.idc:system/usr/idc/touch_dev.idc
+
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/audio_policy.conf:system/etc/audio_policy.conf \
+    device/lge/hammerhead/mixer_paths.xml:system/etc/mixer_paths.xml
+
+PRODUCT_COPY_FILES += \
+    frameworks/av/media/libstagefright/data/media_codecs_google_audio.xml:system/etc/media_codecs_google_audio.xml \
+    frameworks/av/media/libstagefright/data/media_codecs_google_telephony.xml:system/etc/media_codecs_google_telephony.xml \
+    frameworks/av/media/libstagefright/data/media_codecs_google_video.xml:system/etc/media_codecs_google_video.xml \
+    device/lge/hammerhead/media_codecs.xml:system/etc/media_codecs.xml \
+    device/lge/hammerhead/media_profiles.xml:system/etc/media_profiles.xml
+
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/bcmdhd.cal:system/etc/wifi/bcmdhd.cal
+
+# These are the hardware-specific features
+PRODUCT_COPY_FILES += \
+    frameworks/native/data/etc/handheld_core_hardware.xml:system/etc/permissions/handheld_core_hardware.xml \
+    frameworks/native/data/etc/android.hardware.camera.flash-autofocus.xml:system/etc/permissions/android.hardware.camera.flash-autofocus.xml \
+    frameworks/native/data/etc/android.hardware.camera.front.xml:system/etc/permissions/android.hardware.camera.front.xml \
+    frameworks/native/data/etc/android.hardware.camera.full.xml:system/etc/permissions/android.hardware.camera.full.xml \
+    frameworks/native/data/etc/android.hardware.camera.raw.xml:system/etc/permissions/android.hardware.camera.raw.xml \
+    frameworks/native/data/etc/android.hardware.location.gps.xml:system/etc/permissions/android.hardware.location.gps.xml \
+    frameworks/native/data/etc/android.hardware.wifi.xml:system/etc/permissions/android.hardware.wifi.xml \
+    frameworks/native/data/etc/android.hardware.wifi.direct.xml:system/etc/permissions/android.hardware.wifi.direct.xml \
+    frameworks/native/data/etc/android.hardware.sensor.proximity.xml:system/etc/permissions/android.hardware.sensor.proximity.xml \
+    frameworks/native/data/etc/android.hardware.sensor.light.xml:system/etc/permissions/android.hardware.sensor.light.xml \
+    frameworks/native/data/etc/android.hardware.sensor.gyroscope.xml:system/etc/permissions/android.hardware.sensor.gyroscope.xml \
+    frameworks/native/data/etc/android.hardware.sensor.barometer.xml:system/etc/permissions/android.hardware.sensor.barometer.xml \
+    frameworks/native/data/etc/android.hardware.sensor.stepcounter.xml:system/etc/permissions/android.hardware.sensor.stepcounter.xml \
+    frameworks/native/data/etc/android.hardware.sensor.stepdetector.xml:system/etc/permissions/android.hardware.sensor.stepdetector.xml \
+    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.jazzhand.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.jazzhand.xml \
+    frameworks/native/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml \
+    frameworks/native/data/etc/android.hardware.usb.accessory.xml:system/etc/permissions/android.hardware.usb.accessory.xml \
+    frameworks/native/data/etc/android.hardware.usb.host.xml:system/etc/permissions/android.hardware.usb.host.xml \
+    frameworks/native/data/etc/android.hardware.telephony.gsm.xml:system/etc/permissions/android.hardware.telephony.gsm.xml \
+    frameworks/native/data/etc/android.hardware.audio.low_latency.xml:system/etc/permissions/android.hardware.audio.low_latency.xml \
+    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:system/etc/permissions/android.hardware.bluetooth_le.xml \
+    frameworks/native/data/etc/android.hardware.telephony.cdma.xml:system/etc/permissions/android.hardware.telephony.cdma.xml \
+    frameworks/native/data/etc/android.hardware.ethernet.xml:system/etc/permissions/android.hardware.ethernet.xml
+
+# For GPS
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/sec_config:system/etc/sec_config
+
+# NFC access control + feature files + configuration
+PRODUCT_COPY_FILES += \
+    frameworks/native/data/etc/android.hardware.nfc.xml:system/etc/permissions/android.hardware.nfc.xml \
+    frameworks/native/data/etc/android.hardware.nfc.hce.xml:system/etc/permissions/android.hardware.nfc.hce.xml \
+    device/lge/hammerhead/nfc/libnfc-brcm.conf:system/etc/libnfc-brcm.conf \
+    device/lge/hammerhead/nfc/libnfc-brcm-20791b05.conf:system/etc/libnfc-brcm-20791b05.conf
+
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/thermal-engine-8974.conf:system/etc/thermal-engine-8974.conf
+
+# For SPN display
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/spn-conf.xml:system/etc/spn-conf.xml
+
+PRODUCT_TAGS += dalvik.gc.type-precise
+
+# This device is xhdpi.  However the platform doesn't
+# currently contain all of the bitmaps at xhdpi density so
+# we do this little trick to fall back to the hdpi version
+# if the xhdpi doesn't exist.
+PRODUCT_AAPT_CONFIG := normal hdpi xhdpi xxhdpi
+PRODUCT_AAPT_PREF_CONFIG := xxhdpi
+
+PRODUCT_CHARACTERISTICS := nosdcard
+
+DEVICE_PACKAGE_OVERLAYS := \
+    device/lge/hammerhead/overlay
+
+PRODUCT_PACKAGES := \
+    libwpa_client \
+    hostapd \
+    dhcpcd.conf \
+    wpa_supplicant \
+    wpa_supplicant.conf
+
+# Live Wallpapers
+PRODUCT_PACKAGES += \
+    LiveWallpapersPicker \
+    librs_jni
+
+PRODUCT_PACKAGES += \
+    gralloc.msm8974 \
+    libgenlock \
+    hwcomposer.msm8974 \
+    memtrack.msm8974 \
+    libqdutils \
+    libqdMetaData
+
+PRODUCT_PACKAGES += \
+    libc2dcolorconvert \
+    libstagefrighthw \
+    libOmxCore \
+    libmm-omxcore \
+    libOmxVdec \
+    libOmxVdecHevc \
+    libOmxVenc
+
+PRODUCT_PACKAGES += \
+    audio.primary.msm8974 \
+    audio.a2dp.default \
+    audio.usb.default \
+    audio.r_submix.default \
+    libaudio-resampler
+
+# Audio effects
+PRODUCT_PACKAGES += \
+    libqcomvisualizer \
+    libqcomvoiceprocessing \
+    libqcomvoiceprocessingdescriptors \
+    libqcompostprocbundle
+
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/audio_effects.conf:system/vendor/etc/audio_effects.conf
+
+PRODUCT_PACKAGES += \
+    libqomx_core \
+    libmmcamera_interface \
+    libmmjpeg_interface \
+    camera.hammerhead \
+    mm-jpeg-interface-test \
+    mm-qcamera-app
+
+PRODUCT_PACKAGES += \
+    keystore.msm8974
+
+PRODUCT_PACKAGES += \
+    power.msm8974
+
+# GPS configuration
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/gps.conf:system/etc/gps.conf
+
+# GPS
+PRODUCT_PACKAGES += \
+    libloc_adapter \
+    libloc_eng \
+    libloc_api_v02 \
+    libloc_ds_api \
+    libloc_core \
+    libizat_core \
+    libgeofence \
+    libgps.utils \
+    gps.msm8974 \
+    flp.msm8974 \
+    liblbs_core \
+    flp.conf
+
+# NFC packages
+PRODUCT_PACKAGES += \
+    nfc_nci.bcm2079x.default \
+    NfcNci \
+    Tag
+
+PRODUCT_PACKAGES += \
+    libion
+
+PRODUCT_PACKAGES += \
+    lights.hammerhead
+
+PRODUCT_PACKAGES += \
+    com.android.future.usb.accessory
+
+# Filesystem management tools
+PRODUCT_PACKAGES += \
+    e2fsck
+
+# for off charging mode
+PRODUCT_PACKAGES += \
+    charger_res_images
+
+PRODUCT_PACKAGES += \
+    bdAddrLoader
+
+PRODUCT_PACKAGES += \
+    power.hammerhead
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.opengles.version=196608
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.sf.lcd_density=480
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.hwc.mdpcomp.enable=true
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.hwui.texture_cache_size=72 \
+    ro.hwui.layer_cache_size=48 \
+    ro.hwui.r_buffer_cache_size=8 \
+    ro.hwui.path_cache_size=32 \
+    ro.hwui.gradient_cache_size=1 \
+    ro.hwui.drop_shadow_cache_size=6 \
+    ro.hwui.texture_cache_flushrate=0.4 \
+    ro.hwui.text_small_cache_width=1024 \
+    ro.hwui.text_small_cache_height=1024 \
+    ro.hwui.text_large_cache_width=2048 \
+    ro.hwui.text_large_cache_height=1024
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    drm.service.enabled=true
+
+# Set sensor streaming rate
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.qti.sensors.max_geomag_rotv=60 \
+    ro.qti.sensors.max_gyro_rate=200 \
+    ro.qti.sensors.max_accel_rate=200 \
+    ro.qti.sensors.max_grav=200 \
+    ro.qti.sensors.max_rotvec=200 \
+    ro.qti.sensors.max_orient=200 \
+    ro.qti.sensors.max_linacc=200 \
+    ro.qti.sensors.max_gamerv_rate=200
+
+# Enable optional sensor types
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.qti.sensors.smd=true \
+    ro.qti.sensors.game_rv=true \
+    ro.qti.sensors.georv=true \
+    ro.qti.sensors.smgr_mag_cal_en=true \
+    ro.qti.sensors.step_detector=true \
+    ro.qti.sensors.step_counter=true
+
+# Enable some debug messages by default
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.debug.sensors.hal=w \
+    debug.qualcomm.sns.daemon=w \
+    debug.qualcomm.sns.libsensor1=w
+
+# Ril sends only one RIL_UNSOL_CALL_RING, so set call_ring.multiple to false
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.telephony.call_ring.multiple=0
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    wifi.interface=wlan0 \
+    wifi.supplicant_scan_interval=15
+
+# Enable AAC 5.1 output
+PRODUCT_PROPERTY_OVERRIDES += \
+    media.aac_51_output_enabled=true
+
+# Do not power down SIM card when modem is sent to Low Power Mode.
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.radio.apm_sim_not_pwdn=1
+
+# LTE, CDMA, GSM/WCDMA
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.telephony.default_network=10 \
+    telephony.lteOnCdmaDevice=1 \
+    persist.radio.mode_pref_nv10=1
+
+# update 1x signal strength after 2s
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+    persist.radio.snapshot_enabled=1 \
+    persist.radio.snapshot_timer=2
+
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+    persist.radio.use_cc_names=true
+
+# If data_no_toggle is 1 then active and dormancy enable at all times.
+# If data_no_toggle is 0 there are no reports if the screen is off.
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.radio.data_no_toggle=1
+
+# Audio Configuration
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.audio.handset.mic.type=digital \
+    persist.audio.dualmic.config=endfire \
+    persist.audio.fluence.voicecall=true \
+    persist.audio.fluence.voicecomm=true \
+    persist.audio.fluence.voicerec=false \
+    persist.audio.fluence.speaker=false
+
+# Setup custom emergency number list based on the MCC. This is needed by RIL
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.radio.custom_ecc=1
+
+# set default USB configuration
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+    persist.sys.usb.config=mtp
+
+# Request modem to send PLMN name always irrespective
+# of display condition in EFSPN.
+# RIL uses this property.
+PRODUCT_PROPERTY_OVERRIDES += \
+    persist.radio.always_send_plmn=true
+
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+    rild.libpath=/system/lib/libril-qc-qmi-1.so
+
+# Camera configuration
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+    camera.disable_zsl_mode=1
+
+# Input resampling configuration
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.input.noresample=1
+
+# Modem debugger
+ifneq (,$(filter userdebug eng, $(TARGET_BUILD_VARIANT)))
+PRODUCT_PACKAGES += \
+    QXDMLogger
+
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/init.hammerhead.diag.rc.userdebug:root/init.hammerhead.diag.rc
+else
+PRODUCT_COPY_FILES += \
+    device/lge/hammerhead/init.hammerhead.diag.rc.user:root/init.hammerhead.diag.rc
+endif
+
+# setup dalvik vm configs.
+$(call inherit-product, frameworks/native/build/phone-xhdpi-2048-dalvik-heap.mk)
+
+$(call inherit-product-if-exists, hardware/qcom/msm8x74/msm8x74.mk)
+$(call inherit-product-if-exists, vendor/qcom/gpu/msm8x74/msm8x74-gpu-vendor.mk)
+$(call inherit-product-if-exists, hardware/broadcom/wlan/bcmdhd/firmware/bcm4339/device-bcm.mk)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
 ### 第四章 进程间通信--Android的Binder
@@ -1733,4 +2325,4 @@ vendorsetup.sh文件会在初始化编译环境时被eventsetup.sh文件包含�
 
 ### 第二十三章 系统升级模块--- Android的Recovery模块
 
-### 第二十四章 Android的调试方法
+### 第二十四章 Android的调试方法·
