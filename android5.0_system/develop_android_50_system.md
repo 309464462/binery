@@ -1569,7 +1569,127 @@ PRODUCT_LOCALES := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_LOCALES))
 
 ​	对于不带有动态库的apk应用，不用关心系统是32位还是64位。但是杜宇包含有动态库的应用，还是需要考虑将动态库编译成32位和64位的。只要执行lunch命令时选择的产品是64位的，那么编译一个动态库时就会同时产生32位的版本和64位的版本的文件。其中32位版本放在了out/.../system/lib 目录下，64位版本放在了 out/..../system/lib64下。
 
-​      Android5.0中apk优化后的odex文件存放的位置也发生了变化，Android5.0以前apk优化后的odex文件存放在/data/dalvik-cache目录下。Android5.0 后这些文件存放在apk文件所在的目录的"arm",“arm64”目录下.
+​      Android5.0中apk优化后的odex文件存放的位置也发生了变化，Android5.0以前apk优化后的odex文件存放在/data/dalvik-cache目录下。Android5.0 后这些文件存放在apk文件所在的目录的"arm",“arm64”目录下。
+
+#### 2.2 Android 的产品配置文件
+
+> 产品配置文件的作用是按照Build 系统的要求，将生成
+>
+> - 产品的各种image文件所需要的配置信息(如版本号，各种参数等)、
+> - 资源(图片、字体、铃声等)、
+> - 二进制文件（apk、jar包、so库等）
+>
+> 有机的组织起来，同时进行剪裁，加入或去掉一些模块。
+>
+> ​	Android的产品配置文件位于源码的device目录下，但是产品配置文件也可以放在vender目录下。这两个目录从Buld系统的角度看没太大的区别，Build系统中搜索产品配置的关键文件时会同事在这两个目录下进行，但是在实际使用中，往往会让这两个目录配合使用，通常产品配置文件放在device目录下，而vendor目录下则存放一些硬件的HAL库。编译某一款手机的“刷机包”之前，需要将手机上的一些不开源的HAL库（主要是so文件）、驱动等抽取出来，放在vender目录下。
+
+##### 2.2.1 分析hammerhead 的配置文件
+
+```shell
+lx@lx-pc:/opt/lollipop-5.1.1_r6-release_3rd/device$ tree -L 2 ./
+./
+├── asus
+│   ├── deb
+│   ├── flo
+│   ├── flo-kernel
+│   ├── fugu
+│   ├── fugu-kernel
+│   ├── grouper
+│   └── tilapia
+├── common
+│   ├── CleanSpec.mk
+│   ├── clear-factory-images-variables.sh
+│   ├── generate-blob-lists.sh
+│   ├── generate-factory-images-common.sh
+│   ├── generate-packages.sh
+│   ├── gps
+│   └── populate-new-device.sh
+├── generic
+│   ├── arm64
+│   ├── armv7-a-neon
+│   ├── common
+│   ├── goldfish
+│   ├── mini-emulator-arm64
+│   ├── mini-emulator-armv7-a-neon
+│   ├── mini-emulator-mips
+│   ├── mini-emulator-x86
+│   ├── mini-emulator-x86_64
+│   ├── mips
+│   ├── qemu
+│   ├── x86
+│   └── x86_64
+├── google
+│   ├── accessory
+│   └── atv
+├── htc
+│   ├── flounder
+│   └── flounder-kernel
+├── lge
+│   ├── hammerhead
+│   ├── hammerhead-kernel
+│   ├── mako
+│   └── mako-kernel
+├── moto
+│   ├── shamu
+│   └── shamu-kernel
+├── nexell
+│   ├── dckim
+│   ├── lepus
+│   ├── library
+│   ├── library2
+│   ├── library_mwsr
+│   ├── s5p4418_drone
+│   ├── s5p4418_general
+│   ├── s5p6818_drone
+│   └── s5p6818_general
+├── sample
+│   ├── Android.mk
+│   ├── apps
+│   ├── CleanSpec.mk
+│   ├── etc
+│   ├── frameworks
+│   ├── MODULE_LICENSE_APACHE2
+│   ├── overlays
+│   ├── products
+│   ├── README.txt
+│   ├── sdk_addon
+│   └── skins
+└── samsung
+    └── manta
+```
+
+  通常device目录中有几个子目录。
+
+（1）common：用来存放各个产品通用的配置脚本、文件等。
+
+（2）sample：一个产品配置的例子，写一个新的产品配置时可以使用sample目录下文件作为模板
+
+（3）google：几个简单的模块，用途不详。
+
+（4）generic：存放的用于模拟器的产品，包括x86、arm、mips架构
+
+（5）asus、lge、samsung：分别代表宏碁、LG、三星3家公司。各家公司的产品存放在对应的目录下。
+
+> 如果需要添加新的产品，可以在device的目录下新建一个目录。
+>
+> hammerhead手机由LG代工的，它的产品配置文件位于lge目录下，具体内容如下。
+
+（1）hammerhead：存放 Google Nexue5的产品的配置文件，也就是下面分析的重点。
+（2）hammerhead-kernel：存放的是hammerhead的二进制文件
+（3） mako：存放的是Nexus4 的产品配置文件
+（4）mako-kernel：存放的nexus4 kernel的image
+
+下面介绍Build系统会包含产品配置中的几个文件，这几个文件和BUild系统关系最为紧密的，也是产品配置的关键文件，整个产品目录的组织就是围绕着这几个文件展开的。
+
+###### 1.vendorsetup.sh
+
+vendorsetup.sh文件会在初始化编译环境时被eventsetup.sh文件包含进去。它主要的作用是调用add_lunch_combo命令来添加产品的名称串。例如harmerhead目录下的vendorsetup.sh文件的内容是：
+
+> add_lunch_combo aosp_hammerhead-userdebug
+
+产品前面通常加上一个"aosp_",这个前缀从编译角度看并无实际意义，它只是产品名称的一部分。AOSP的含义是 android open source project。除了"aosp__" 前缀，还有另一个前缀"full—"。从这里可以看到：即使在同一个产品配置中，也可以非常方便的编译多个不同的版本来。
+
+​	产品的编译类型有3种：eng、user和userdebug。
 
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
 
