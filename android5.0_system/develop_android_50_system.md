@@ -1911,7 +1911,7 @@ $(call inherit-product-if-exists, vendor/lge/hammerhead/device-vendor.mk)
 device.mk是产品配置里经常要修改的一个文件。产品定义中需要包含进的模块，文件以及各种环境变量的定义一般都放在这个文件里面。device.mk的文件比较大，重复项也比较多。下面是完整的文件
 
 ```shell
-
+#将kernel的景象复制到目标系统里
 ifeq ($(TARGET_PREBUILT_KERNEL),)
 ifeq ($(USE_SVELTE_KERNEL),true)
 LOCAL_KERNEL := device/lge/hammerhead_svelte-kernel/zImage-dtb
@@ -1925,7 +1925,7 @@ endif
 
 PRODUCT_COPY_FILES := \
     $(LOCAL_KERNEL):kernel
-
+#将linux系统的初始化文件和分区表等复制到目标系统里
 PRODUCT_COPY_FILES += \
     device/lge/hammerhead/init.hammerhead.rc:root/init.hammerhead.rc \
     device/lge/hammerhead/init.hammerhead.usb.rc:root/init.hammerhead.usb.rc \
@@ -1944,6 +1944,7 @@ PRODUCT_COPY_FILES += \
     device/lge/hammerhead/hs_detect.kcm:system/usr/keychars/hs_detect.kcm
 
 # Prebuilt input device calibration files
+#触摸矫正文件
 PRODUCT_COPY_FILES += \
     device/lge/hammerhead/touch_dev.idc:system/usr/idc/touch_dev.idc
 
@@ -1962,6 +1963,7 @@ PRODUCT_COPY_FILES += \
     device/lge/hammerhead/bcmdhd.cal:system/etc/wifi/bcmdhd.cal
 
 # These are the hardware-specific features
+#指定硬件相关特性
 PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/handheld_core_hardware.xml:system/etc/permissions/handheld_core_hardware.xml \
     frameworks/native/data/etc/android.hardware.camera.flash-autofocus.xml:system/etc/permissions/android.hardware.camera.flash-autofocus.xml \
@@ -2011,11 +2013,12 @@ PRODUCT_TAGS += dalvik.gc.type-precise
 # currently contain all of the bitmaps at xhdpi density so
 # we do this little trick to fall back to the hdpi version
 # if the xhdpi doesn't exist.
+#定义系统支持的分辨率
 PRODUCT_AAPT_CONFIG := normal hdpi xhdpi xxhdpi
 PRODUCT_AAPT_PREF_CONFIG := xxhdpi
 
 PRODUCT_CHARACTERISTICS := nosdcard
-
+#指定系统overlay的目录
 DEVICE_PACKAGE_OVERLAYS := \
     device/lge/hammerhead/overlay
 
@@ -2027,6 +2030,7 @@ PRODUCT_PACKAGES := \
     wpa_supplicant.conf
 
 # Live Wallpapers
+#动态壁纸
 PRODUCT_PACKAGES += \
     LiveWallpapersPicker \
     librs_jni
@@ -2126,7 +2130,7 @@ PRODUCT_PACKAGES += \
 
 PRODUCT_PACKAGES += \
     power.hammerhead
-
+#设置系统属性
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.opengles.version=196608
 
@@ -2261,17 +2265,24 @@ endif
 
 # setup dalvik vm configs.
 $(call inherit-product, frameworks/native/build/phone-xhdpi-2048-dalvik-heap.mk)
-
+#包含更多的配置文件
 $(call inherit-product-if-exists, hardware/qcom/msm8x74/msm8x74.mk)
 $(call inherit-product-if-exists, vendor/qcom/gpu/msm8x74/msm8x74-gpu-vendor.mk)
 $(call inherit-product-if-exists, hardware/broadcom/wlan/bcmdhd/firmware/bcm4339/device-bcm.mk)
 ```
 
+> Android overlay 机制允许在不修改packages中apk的情况下，来自定义 framework和package中的资源文件，实现资源的定制。来达到显示不同的UI得目的 
 
+- PRODUCT_COPY_FILES：一个格式为“源文件路径：目标文件路径”字串的集合。这字串仅仅是复制，如果时复制apk或者java库，这些文件的签名会被保留下来。
+- PRODUCT_PACKAGES：用来定义产品的模块列表，所有在模块列表的模块的定义都会被执行。
+- PRODUCT_AAPT_CONFIG: 指定了系统中能够支持的屏幕密度类型。所谓支持，是指系统编译时，会将相应的资源文件添加到framework_res.apk文件中。
+- PRODUCT_AAPT_PREF_CONFIG：指定系统实际的屏幕密度类型
+- DEVICE_PACKAGE_OVERLAYS：系统编译时会使用overlay目录下存放的资源文件替换系统或模块原有的资源文件，这样在不覆盖原生资源文件的情况下，就能实现产品的个性化。而且overlay的目录可以有多个，它们会按照在变量中的先后顺序替换资源文件，利用这个特性可以定义公共的overlay目录，以及各个产品专属的overlay目录，最大新都的重用资源文件。
+- PRODUCT_PROPERTY_OVERRIDES：定义系统的属性值。如果属性以“ro.”开头，那么这个属性就是制度属性。一旦设置，属性值将不会发生改变。如果属性名称以"persist."开头表示他的值将写入文件/data/property中，关于属性的详细介绍请参考“属性系统的内容”
 
+2.2.2 编译类型eng、user和userdebug
 
-
-
+![1533920021706](/ing/1533920021706.png)
 
 
 
