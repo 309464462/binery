@@ -2452,20 +2452,102 @@ endif
 
 ![1534174567409](/ing/1534174567409.png)
 
+> 只有动态库可以被 install/copy到应用程序包(APK). 静态库则可以被链接入动态库。
+>
+> 可以在一个Android.mk中定义一个或多个modules. 也可以将同一份source 加进多个modules.
+>
+> Build System帮我们处理了很多细节而不需要我们再关心。例如：你不需要在Android.mk中列出头文件和外部依赖文件。
+
 ###### 7.编译一个native的静态库
 
 ![1534174877813](/ing/1534174877813.png)
 
+多个文件同时编译的是可以是这样
+
+```shell
+#编译静态库 
+LOCAL_PATH := $(call my-dir) 
+include $(CLEAR_VARS) 
+LOCAL_MODULE = libhellos 
+LOCAL_CFLAGS = $(L_CFLAGS) 
+LOCAL_SRC_FILES = hellos.c 
+LOCAL_C_INCLUDES = $(INCLUDES) 
+LOCAL_SHARED_LIBRARIES := libcutils 
+LOCAL_COPY_HEADERS_TO := libhellos 
+LOCAL_COPY_HEADERS := hellos.h 
+include $(BUILD_STATIC_LIBRARY) 
+#编译动态库 
+LOCAL_PATH := $(call my-dir) 
+include $(CLEAR_VARS) 
+LOCAL_MODULE = libhellod 
+LOCAL_CFLAGS = $(L_CFLAGS) 
+LOCAL_SRC_FILES = hellod.c 
+LOCAL_C_INCLUDES = $(INCLUDES) 
+LOCAL_SHARED_LIBRARIES := libcutils 
+LOCAL_COPY_HEADERS_TO := libhellod 
+LOCAL_COPY_HEADERS := hellod.h 
+include $(BUILD_SHARED_LIBRARY) 
+#使用静态库 
+LOCAL_PATH := $(call my-dir) 
+include $(CLEAR_VARS) 
+LOCAL_MODULE := hellos 
+LOCAL_STATIC_LIBRARIES := libhellos 
+LOCAL_SHARED_LIBRARIES := 
+LOCAL_LDLIBS += -ldl 
+LOCAL_CFLAGS := $(L_CFLAGS) 
+LOCAL_SRC_FILES := mains.c 
+LOCAL_C_INCLUDES := $(INCLUDES) 
+include $(BUILD_EXECUTABLE) 
+#使用动态库 
+LOCAL_PATH := $(call my-dir) 
+include $(CLEAR_VARS) 
+LOCAL_MODULE := hellod 
+LOCAL_MODULE_TAGS := debug 
+LOCAL_SHARED_LIBRARIES := libc libcutils libhellod 
+LOCAL_LDLIBS += -ldl 
+LOCAL_CFLAGS := $(L_CFLAGS) 
+LOCAL_SRC_FILES := maind.c 
+LOCAL_C_INCLUDES := $(INCLUDES) 
+include $(BUILD_EXECUTABLE)
+```
+
 2.3.3 预编译模块的目标定义
 
-1. 定义apk文件目标
-2. 定义静态jar包目标
+> 通常的方法是通过	PRODUCT_COPY_FILES变量将这些文件直接复制到生成的image文件中，但是有些apk文件或jar包，需要使用系统的签名才能正常运行，这样复制的方式就行不通了。另外，一些动态库问文件可能是源码中的某些模块所依赖的，用复制的方法也无法建立依赖关系，这将导致这些模块的编译失败。Android可以通过预编译模块的方式来解决上面的问题。
+>
+> ​	定义一个预编译模块和顶一个普通的编译模块格式相似的。不同的是LOCAL_SRC_FILES变量指定的不是文件，而是二进制文件的路径，同时还要通过LOCAL_MODULE_CLASS来指定模块的类型，最后include的是BUILD_PREBUILT变量定义的编译文件。
+
+1.  定义apk文件目标
+
+   ![1534175918861](/ing/1534175918861.png)
+
+2.  定义静态jar包目标
+
+   ![1534175990045](/ing/1534175990045.png)
+
 3. 定义动态库文件目标
+
+   ![1534176006925](/ing/1534176006925.png)
+
 4. 定义可执行文件目标
+
+   ![1534176074589](/ing/1534176074589.png)
+
 5. 定义xml文件目标
+
+   ![1534176169351](/ing/1534176169351.png)
+
 6. 定义host平台下的jar包
 
 > host平台：主机平台
+>
+> 这是个很有趣的例子，将系统编译时用到的sigapk.jar预编译，然后复制到out目录中，这样的BUild系统将能够使用这个文件来给其他文件签名：
+
+![1534176269441](/ing/1534176269441.png)
+
+![1534176330274](/ing/1534176330274.png)
+
+
 
 2.3.4 常用LOCAL_ 变量
 
