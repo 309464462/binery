@@ -2591,31 +2591,161 @@ include $(BUILD_EXECUTABLE)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ### 第三章 连接Android和Linux内核的桥梁-- Android的Bionic
+
+> Bionic库是android的基础库之一，也是连接android和linux内核的桥梁。bionic中包含了很多基本功能，这些功能大部分源于linux，但是和标准的linux之间有很多细微的差别。同时bionic中增加了一些新的模块，服务于android的上层代码。了解bionic中这些模块的原理，对于阅读其他部分的代码会有比较大的帮助。
+
+#### 3.1 bionic简介
+
+> bionic包含了系统中基本的lib库，包括
+>
+> - libc  
+>
+>   (libc是Linux下的ANSI C的函数库。这个库可以根据 头文件划分为 15 个部分，其中包括：字符类型 ()、[错误码](https://baike.baidu.com/item/%E9%94%99%E8%AF%AF%E7%A0%81)()、 浮点常数 ()、数学常数 ()、标准定义 ()、 标准 I/O ()、工具函数 ()、字符串操作 ()、 时间和日期 ()、可变参数表 ()、信号 ()、 非局部跳转 ()、本地信息 ()、程序断言 () 等等。
+>
+>   源码路径：bionic/libc 
+>
+>   头文件目录：bionic/libc/include  )
+>
+> - libm 
+>
+>   (标准数学库libm 
+>
+>   libm.a/so的源码路径：bionic/libm 
+>
+>   头文件路径：bionic/libm/include )
+>
+> - libdl 
+>
+>     (可以缩小应用程序的大小， dlopen加载的函数，可以在真正要用到的时候再加载进来，减小内存的占用。  )
+>
+> - libstd++
+>
+>    (libstdc++虽然提供了c++程序的标准库，但它并不与内核打交道。对于系统级别的事件，libstdc++首先是会与glibc交互，才能和内核通信。相比glibc来说，libstdc++就显得没那么基础了
+>
+>   libstdc++.a/so的源码路径：bionic/libstdc++ 
+>
+>   头文件路径：bionic/libstdc++/include  )
+>
+> - libthread_db
+>
+>   （多线程程序的调试器库libthread_db：
+>
+>   libthread_db.a/so的源码路径：bionic/libthread_db 
+>
+>   头文件路径：bionic/libthread_db/include ）
+>
+>   以及android特有的连接器linker。
+
+下面是一些其他的相关的
+
+> c语言基本的工具库libcutils:
+> libcutils.a/so的源码路径：system/core/libcutils
+> 头文件路径：system/core/include/cutils
+> 从其Android.mk中可以看出编译了libcutils.a和libcutils.so
+>
+>  
+>
+> ext4相关的工具库libext4_utils：
+> libext4_utils.a/so的源码路径：system/extras/ext4_utils
+> 头文件路径：system/extras/ext4_utils
+> 从其Android.mk中可以看出编译了libext4_utils.a和libext4_utils.so
+>
+> c++实现的底层工具库libutils：
+> 这个库可以分成两个部分，一个部分是底层的工具，另外一个就是实现主要为实现IPC（进程间通讯）的Binder机制。
+> libutils.a/so的源码路径：frameworks/base/libs/utils
+> 头文件路径：frameworks/base/include/utils
+> 详细情况键附录：
+>
+>  
+>
+> 浏览器引擎核心库libwebcore：
+> libwebcore.a/so的源码路径：external/webkit
+> 头文件路径：
+>
+>  
+>
+> 通用压缩库libz：
+> libz.a/so的源码路径：external/zlib
+>
+> log库：
+> system/core/liblog
+>
+> 附录：
+> Android的底层库libutils介绍
+>  第一部分 libutils概述
+>
+> 　　libutils是Android的底层库，这个库以C++实现，它提供的API也是C++的。Android的层次的C语言程序和库，大都基于libutils开发。
+> 　　libutils中的头文件如下所示：
+> 　　frameworks/base/include/utils
+> 　　libutils的源文件：
+> 　　frameworks/base/libs/utils
+> 　　libutils的库名称：
+> 　　libutils.so
+> 　　这个库可以分成两个部分，一个部分是底层的工具，另外一个就是实现主要为实现IPC（进程间通讯）的Binder机制。
+>
+> 　　第二部分 公共库概述
+>
+> 　　libutils中的公共库部分主要包含的头文件如下所示：
+> 　　Errors.h：定义宏表示错误代码
+> 　　Endian.h：定义表示大小端的宏
+> 　　misc.h：几个字符串和文件相关的功能函数
+>
+> 　　TextOutput.h：定义文本输出的基类TextOutput
+> 　　BufferedTextOutput.h：类BufferedTextOutput，它是一个TextOutput的实现
+> 　　Pipe.h：定义管道类Pipe
+> 　　Buffer.h：定义内存缓冲区域的类Buffer
+> 　　List.h：定义链表的模版类
+>
+> 　　SharedBuffer.h：定义类SharedBuffer表示共享内存。
+> 　　String16.h：定义表示双字节字符串的类String16
+> 　　String8.h：定义表示单字节字符串的类String8，并包含了从String16转换功能
+>
+> 　　VectorImpl.h：定义表示向量的类VectorImpl
+> 　　Vector.h：定义继承VectorImpl的类模版Vector，以及排序向量类SortedVectorImpl
+> 　　SortedVector.h：定义排序向量的模版SortedVector
+> 　　KeyedVector.h：定义使用关键字的向量模板KeyedVector
+>
+> 　　threads.h：定义线程相关的类，包括线程Thread、互斥量Mutex、条件变量Condition、读写锁　　　　　　ReadWriteLock等
+> 　　socket.h：定义套结字相关的类Socket
+> 　　Timers.h：定义时间相关的函数和定时器类DurationTimer。
+> 　　ZipEntry.h、ZipFileCRO.h、ZipFile.h、ZipFileRO.h、ZipUtils.h：与zip功能相关的类。
+>
+> 　　第三部分 Binder进程间通讯部分
+>
+> 　　Binder是进程间通讯部分的核心,它为不同的系统提供了可移植的进程间通讯手段。
+> 　　RefBase.h :
+> 　　引用计数，定义类RefBase。
+> 　　Parcel.h :
+> 　　为在IPC中传输的数据定义容器，定义类Parcel
+> 　　IBinder.h：
+> 　　Binder对象的抽象接口， 定义类IBinder
+> 　　Binder.h：
+> 　　Binder对象的基本功能， 定义类Binder和BpRefBase
+> 　　BpBinder.h：
+> 　　BpBinder的功能，定义类BpBinder
+> 　　IInterface.h：
+> 　　为抽象经过Binder的接口定义通用类，
+> 　　定义类IInterface，类模板BnInterface，类模板BpInterface
+> 　　ProcessState.h
+> 　　表示进程状态的类，定义类ProcessState
+> 　　IPCThreadState.h
+> 　　表示IPC线程的状态，定义类IPCThreadState
+>
+> 　　IServiceManager.h：表示服务管理器的类，供其它需要构造服务的类使用
+> 　　IPermissionController.h：权限控制类。
+>
+> ​    几个与内存相关的类的头文件如下所示：
+> 　　IMemory.h：定义内存相关类的接口，表示堆内存的类IMemoryHeap和BnMemoryHeap，表示一般内存的类
+>
+> 　　IMemory和BnMemory。
+> 　　MemoryHeapBase.h：定义类MemoryHeapBase，继承并实现BnMemoryHeap
+> 　　MemoryBase.h：定义类MemoryBase，继承并实现BnMemory
+> 　　在一般的使用过程中，通常是以使用MemoryHeapBase类分配一块堆内存（类似malloc），而MemoryBase表示从一块分配好堆内存中的一部分内存。
+>
+> 　　此外内存相关的功能中还包含了头文件MemoryDealer.h和MemoryHeapPmem.h。
+
+
 
 ### 第四章 进程间通信--Android的Binder
 
