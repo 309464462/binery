@@ -2745,7 +2745,43 @@ include $(BUILD_EXECUTABLE)
 >
 > 　　此外内存相关的功能中还包含了头文件MemoryDealer.h和MemoryHeapPmem.h。
 
+##### 3.1.1 bionic的特征
 
+> 下面内容来自libc目录下的readme.txt文件的部分内容，这个txt只存在android4.0之前的版本中。
+
+######  1 架构
+
+> Bionic当前支持ARM、x86和Mips指令集。理论上可以支持更多，但是需要做些工作,向SYSCALLS.txt文件中添加系统调用IDS或者修动态连接器。
+>
+>  	ARM相关的代码在目录arch-arm中，x86相关的代码在arch-x86中，mips相关的代码在arch-mips中。
+
+==注意：x86版本只能运行在android的x86设备上，google并没声明能够在普通的x86 Linux发布版本上使用bionic==
+
+###### 2 time_t
+
+> time_t 在32位的cpu上定义为32位，64位的版本需要避免2038年bug，但是linux内核的额维护这认为，现在并不需要考虑这个问题。作为替代，bionic提供了名为“ime64.h”的头文件，里面定义了一个time64_t类型以及相关的函数，例如 mktime64(),localtime64()等。
+
+备注：
+
+> 在计算机应用上，2038年问题可能会导致某些软件在2038年无法正常工作。所有使用POSIX时间表示时间的程序都将受其影响，因为它们的时间起点是[格林尼治时间](https://baike.baidu.com/item/%E6%A0%BC%E6%9E%97%E5%B0%BC%E6%B2%BB%E6%97%B6%E9%97%B4)1970年1月1日0时0分0秒（这个时间名叫 the Unix Epoch），它们用the Unix Epoch经过的秒数（忽略闰秒）来表示时间。这种时间表示法在类Unix（Unix-like）操作系统上是一个标准，并会影响以其C编程语言开发给其他大部份操作系统使用的软件。在大部分的32位操作系统上，此“time_t”数据模式使用一个有符号32位整数(signed int32)存储计算的秒数。依照此“time_t”标准，在此格式能被表示的最后时间是第2147483647秒（代表格林尼治时间2038年1月19日凌晨03:14:07）。下一秒，即格林尼治时间2038年1月19日凌晨03:14:08，由于32位整型[溢出](https://baike.baidu.com/item/%E6%BA%A2%E5%87%BA)，时间将会被“绕回”（wrap around）成一个负数，变成了第 -2147483648 秒（代表格林尼治时间1901年12月13日20:45:52），造成应用程序发生严重的时间错误，而无法运行。 
+
+###### 3 strftime_tz()
+
+> 这个函数内部使用了time64_t，因此，支持的“%s”格式（从epoch起开始的“秒数”）能够超过2038年。
+
+###### 4 时区管理
+
+> 当前时区的名字可以从环境变量TZ中得到。如果TZ不存在，将从系统属性“persist.sys.timezone”中读取。时区数据库和索引文件放在目录/system/usr/share/zoneinfo下，而不是在POSIX规定的目录/usr/share/zoneinfo下面。
+
+###### 5 Off_t
+
+> 同样的，off_t也是32位的。考虑和BSD的继承关系，定义类型为loff_t为64位，但是可以使用typedef定义出off64_t类型，这样让目前和linux 相关的代码一直更加容易。
+
+###### 6 Linux核心文件
+
+> Bionic自带的一套经过清理的Linux内核头文件，允许用户空间代码使用内核特有的声明（如IOCTLs、结构定义、常量等）。这些头文件位于目录：
+
+> bionic/libc/kernel/common
 
 ### 第四章 进程间通信--Android的Binder
 
