@@ -2901,7 +2901,104 @@ if warning_ion:
 sys.exit(0)
 ```
 
-###### 7 
+###### 7Android 特性 
+
+> bionic 提供了少部分Android特有的功能。
+
+（1）访问系统属性。
+
+Android提供了一个简单的“共享键/值对”空间给系统中所有进程使用。用来存储数量不限的“属性”。每个属性由一个限制长度的字符串"键"和一个限制长度的字符串“值”组成。
+
+头文件<sys/sytem_properies.h>定义了读取系统属性的函数。也定义键/值得最大长度。
+
+实际位置：./libc/include/sys/system_properties.h
+
+```c++
+#ifndef _INCLUDE_SYS_SYSTEM_PROPERTIES_H
+#define _INCLUDE_SYS_SYSTEM_PROPERTIES_H
+
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+
+typedef struct prop_info prop_info;
+
+#define PROP_NAME_MAX   32
+#define PROP_VALUE_MAX  92
+
+/* Look up a system property by name, copying its value and a
+** \0 terminator to the provided pointer.  The total bytes
+** copied will be no greater than PROP_VALUE_MAX.  Returns
+** the string length of the value.  A property that is not
+** defined is identical to a property with a length 0 value.
+*/
+int __system_property_get(const char *name, char *value);
+
+/* Set a system property by name.
+**/
+int __system_property_set(const char *key, const char *value);
+
+/* Return a pointer to the system property named name, if it
+** exists, or NULL if there is no such property.  Use 
+** __system_property_read() to obtain the string value from
+** the returned prop_info pointer.
+**
+** It is safe to cache the prop_info pointer to avoid future
+** lookups.  These returned pointers will remain valid for
+** the lifetime of the system.
+*/
+const prop_info *__system_property_find(const char *name);
+
+/* Read the value of a system property.  Returns the length
+** of the value.  Copies the value and \0 terminator into
+** the provided value pointer.  Total length (including
+** terminator) will be no greater that PROP_VALUE_MAX.
+**
+** If name is nonzero, up to PROP_NAME_MAX bytes will be
+** copied into the provided name pointer.  The name will
+** be \0 terminated.
+*/
+int __system_property_read(const prop_info *pi, char *name, char *value);
+
+/* Return a prop_info for the nth system property, or NULL if 
+** there is no nth property.  Use __system_property_read() to
+** read the value of this property.
+**
+** Please do not call this method.  It only exists to provide
+** backwards compatibility to NDK apps.  Its implementation
+** is inefficient and order of results may change from call
+** to call.
+*/ 
+const prop_info *__system_property_find_nth(unsigned n);
+
+/* Pass a prop_info for each system property to the provided
+** callback.  Use __system_property_read() to read the value
+** of this property.
+**
+** This method is for inspecting and debugging the property
+** system.  Please use __system_property_find() instead.
+**
+** Order of results may change from call to call.  This is
+** not a bug.
+*/
+int __system_property_foreach(
+        void (*propfn)(const prop_info *pi, void *cookie),
+        void *cookie);
+
+__END_DECLS
+
+#endif
+```
+
+(2) Android 的用户/组管理
+
+在Android中没有/etc/passwd 和  /etc/groups 文件。Android使用扩展的Linux用户/组管理特性，以确保进程根据权限来对不同的文件系统目录进行访问。
+
+Android策略是：每个已安装的应用程序都有自己的用户ID和组ID。ID从10000开始，小与10000的ID留给系统的守护进程。
+
+tpwnam()能识别一些硬编码的子进程名，能将他们翻译为用户id值：它也能识别“app_1234”这样的组合命令，知道将后面的1234和10000相加，得到ID值为11234。getprnam()也类似。
+
+
 
 ### 第四章 进程间通信--Android的Binder
 
