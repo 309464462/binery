@@ -2996,7 +2996,51 @@ __END_DECLS
 
 Android策略是：每个已安装的应用程序都有自己的用户ID和组ID。ID从10000开始，小与10000的ID留给系统的守护进程。
 
-tpwnam()能识别一些硬编码的子进程名，能将他们翻译为用户id值：它也能识别“app_1234”这样的组合命令，知道将后面的1234和10000相加，得到ID值为11234。getprnam()也类似。
+tpwnam()能识别一些硬编码的子进程名，能将他们翻译为用户id值：它也能识别“app_1234”这样的组合命令，知道将后面的1234和10000相加，得到ID值为11234。getgrnam()也类似。
+
+> getgrnam用来逐一搜索参数那么指定的组名称，找到时便将该组的数据以group结构返回。 
+>
+> ```
+> #include<grp.h>
+> #include<sys/types.h>
+> #include<stdio.h>
+> #include<stdlib.h>
+> int
+> main()
+> {
+> struct group * data;
+> int i=0;
+> data = getgrnam(“adm”);
+> printf("%s:%s:%d:",data->gr_name,data->gr_passwd,data->gr_gid);
+> while(data->gr_mem[i])printf("%s,",data->gr_mem[i++]);
+> printf("\n");
+> }
+> ```
+
+getgrouplist()总是返回用户所属的组。
+
+（3）getservent()
+
+android 中没有 /etc/services，C库在可执行文件中嵌入只读的服务列表作为代替，这个列表被需要他的函数所解析。这些实际上很少用到。
+
+（4）getprotoent（）
+
+在android中没有 /etc/protocal，bionic目前没有实现getprotoent()和相关函数。如果增加的话，很可能会以getservent（）相同的方式实现。
+
+###### 8 DNS解析器
+
+bionic 使用 NetBSD-derived解析库，但是做了一下修改。
+
+- 不实现name-server-switch 特性
+- 读取、system/etc/resolv.conf
+- 从系统属性中读取服务地址列表。代码中会查找"net.dns1“，”net.dns2“等属性。每个属性应包含一个DNS服务器的IP地址。这些属性能够被android系统的其他进程修改设置。在实现上，也支持进程单独的DNS服务器列表，使用属性”net.dns1.<pid>“等，这里的<pid>表示当前进程pid。
+- 执行查询的时候，使用一个合适的随机ID，以提高安全性。
+- 在执行查询时，给本地客户socket绑定一个随机端口号，以提高安全性。
+- 删除了一个源代码，这些源代码会造成许多线程安全问题。
+
+###### 9 Pthread定时器
+
+
 
 
 
