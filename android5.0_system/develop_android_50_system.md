@@ -3042,7 +3042,7 @@ bionic 使用 NetBSD-derived解析库，但是做了一下修改。
 
 支持timer_create(),timer_)gettime(),timer_settime(),和timer_getovertun().
 
-
+Bionic现在也支持SIGEV_THREAD实时定时器。在实现上，使用简单的一个线程一个定时器的机制，不像glibc使用复杂的启发式技术，在多个定时器具有相同属性的情况下，尽可能减少使用的线程数。这意味着，如果你的代码使用许多SIGEV_THREAD定时器，你的程序可能会消耗太多的内存。无论如何，如果你的程序需要许多定时器，最好直接使用timeout事件代替。其他定时器（如SIGEV_SIGNAL）由内核处理，使用更少的系统资源。
 
 ### 第四章 进程间通信--Android的Binder
 
