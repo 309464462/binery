@@ -3040,7 +3040,7 @@ bionic 使用 NetBSD-derived解析库，但是做了一下修改。
 
 ###### 9 Pthread定时器
 
-
+支持timer_create(),timer_)gettime(),timer_settime(),和timer_getovertun().
 
 
 
