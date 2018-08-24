@@ -1567,9 +1567,9 @@ PRODUCT_LOCALES := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_LOCALES))
 
 这4中模式在Zygote进程的启动就可以看出。Android5.0一共定义了4中Zygote进程的启动方式，对应这里介绍的4中模式。具体内容后面在分析。
 
-​	对于不带有动态库的apk应用，不用关心系统是32位还是64位。但是杜宇包含有动态库的应用，还是需要考虑将动态库编译成32位和64位的。只要执行lunch命令时选择的产品是64位的，那么编译一个动态库时就会同时产生32位的版本和64位的版本的文件。其中32位版本放在了out/.../system/lib 目录下，64位版本放在了 out/..../system/lib64下。
+	对于不带有动态库的apk应用，不用关心系统是32位还是64位。但是杜宇包含有动态库的应用，还是需要考虑将动态库编译成32位和64位的。只要执行lunch命令时选择的产品是64位的，那么编译一个动态库时就会同时产生32位的版本和64位的版本的文件。其中32位版本放在了out/.../system/lib 目录下，64位版本放在了 out/..../system/lib64下。
 
-​      Android5.0中apk优化后的odex文件存放的位置也发生了变化，Android5.0以前apk优化后的odex文件存放在/data/dalvik-cache目录下。Android5.0 后这些文件存放在apk文件所在的目录的"arm",“arm64”目录下。
+      Android5.0中apk优化后的odex文件存放的位置也发生了变化，Android5.0以前apk优化后的odex文件存放在/data/dalvik-cache目录下。Android5.0 后这些文件存放在apk文件所在的目录的"arm",“arm64”目录下。
 
 #### 2.2 Android 的产品配置文件
 
@@ -1581,7 +1581,7 @@ PRODUCT_LOCALES := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_LOCALES))
 >
 > 有机的组织起来，同时进行剪裁，加入或去掉一些模块。
 >
-> ​	Android的产品配置文件位于源码的device目录下，但是产品配置文件也可以放在vender目录下。这两个目录从Buld系统的角度看没太大的区别，Build系统中搜索产品配置的关键文件时会同事在这两个目录下进行，但是在实际使用中，往往会让这两个目录配合使用，通常产品配置文件放在device目录下，而vendor目录下则存放一些硬件的HAL库。编译某一款手机的“刷机包”之前，需要将手机上的一些不开源的HAL库（主要是so文件）、驱动等抽取出来，放在vender目录下。
+> 	Android的产品配置文件位于源码的device目录下，但是产品配置文件也可以放在vender目录下。这两个目录从Buld系统的角度看没太大的区别，Build系统中搜索产品配置的关键文件时会同事在这两个目录下进行，但是在实际使用中，往往会让这两个目录配合使用，通常产品配置文件放在device目录下，而vendor目录下则存放一些硬件的HAL库。编译某一款手机的“刷机包”之前，需要将手机上的一些不开源的HAL库（主要是so文件）、驱动等抽取出来，放在vender目录下。
 
 ##### 2.2.1 分析hammerhead 的配置文件
 
@@ -1689,7 +1689,7 @@ vendorsetup.sh文件会在初始化编译环境时被eventsetup.sh文件包含�
 
 产品前面通常加上一个"aosp_",这个前缀从编译角度看并无实际意义，它只是产品名称的一部分。AOSP的含义是 android open source project。除了"aosp__" 前缀，还有另一个前缀"full—"。从这里可以看到：即使在同一个产品配置中，也可以非常方便的编译多个不同的版本来。
 
-​	产品的编译类型有3种：eng、user和userdebug。
+	产品的编译类型有3种：eng、user和userdebug。
 
 ###### 2.AndroidProduct.mk
 
@@ -2515,7 +2515,7 @@ include $(BUILD_EXECUTABLE)
 
 > 通常的方法是通过	PRODUCT_COPY_FILES变量将这些文件直接复制到生成的image文件中，但是有些apk文件或jar包，需要使用系统的签名才能正常运行，这样复制的方式就行不通了。另外，一些动态库问文件可能是源码中的某些模块所依赖的，用复制的方法也无法建立依赖关系，这将导致这些模块的编译失败。Android可以通过预编译模块的方式来解决上面的问题。
 >
-> ​	定义一个预编译模块和顶一个普通的编译模块格式相似的。不同的是LOCAL_SRC_FILES变量指定的不是文件，而是二进制文件的路径，同时还要通过LOCAL_MODULE_CLASS来指定模块的类型，最后include的是BUILD_PREBUILT变量定义的编译文件。
+> 	定义一个预编译模块和顶一个普通的编译模块格式相似的。不同的是LOCAL_SRC_FILES变量指定的不是文件，而是二进制文件的路径，同时还要通过LOCAL_MODULE_CLASS来指定模块的类型，最后include的是BUILD_PREBUILT变量定义的编译文件。
 
 ###### 1  定义apk文件目标
 
@@ -2561,7 +2561,7 @@ include $(BUILD_EXECUTABLE)
 
 > 在android系统中，安装到系统中的APk应用都需要签名，所谓签名就是给应用附加一个数字证书，这个数字证书的作用是表明该应用的确由某人或某公司制作。虽然数字证书有很多用途，但是在android系统中，她唯一的作用就是表明制作者的身份。假如有人开发了一个流氓软件，如果程序没有开发者的数字证书的私钥，那么流氓软件的开发者是不能冒充你来发布软件的。当然，这仅仅是理论上成立而已，最近一段时间，android的签名漏洞已经是尽人皆知，android4.2以及以下版本都受到了影响。
 >
-> ​            在了解Android签名机制之前，先要对数字证书的概念有一个基本的了解，android的数字证书相对而言比较简单，不需要认证机构来颁发和管理证书，主要是基于自我认证的方式。
+>             在了解Android签名机制之前，先要对数字证书的概念有一个基本的了解，android的数字证书相对而言比较简单，不需要认证机构来颁发和管理证书，主要是基于自我认证的方式。
 
 ##### 2.4.1 android的签名方法
 
@@ -2735,7 +2735,7 @@ include $(BUILD_EXECUTABLE)
 > 　　IServiceManager.h：表示服务管理器的类，供其它需要构造服务的类使用
 > 　　IPermissionController.h：权限控制类。
 >
-> ​    几个与内存相关的类的头文件如下所示：
+>     几个与内存相关的类的头文件如下所示：
 > 　　IMemory.h：定义内存相关类的接口，表示堆内存的类IMemoryHeap和BnMemoryHeap，表示一般内存的类
 >
 > 　　IMemory和BnMemory。
@@ -3042,7 +3042,9 @@ bionic 使用 NetBSD-derived解析库，但是做了一下修改。
 
 支持timer_create(),timer_)gettime(),timer_settime(),和timer_getovertun().
 
-Bionic现在也支持SIGEV_THREAD实时定时器。在实现上，使用简单的一个线程一个定时器的机制，不像glibc使用复杂的启发式技术，在多个定时器具有相同属性的情况下，尽可能减少使用的线程数。这意味着，如果你的代码使用许多SIGEV_THREAD定时器，你的程序可能会消耗太多的内存。无论如何，如果你的程序需要许多定时器，最好直接使用timeout事件代替。其他定时器（如SIGEV_SIGNAL）由内核处理，使用更少的系统资源。
+	Bionic现在也支持SIGEV_THREAD实时定时器。在实现上，使用简单的一个线程一个定时器的机制，不像glibc使用复杂的启发式技术，在多个定时器具有相同属性的情况下，尽可能减少使用的线程数。这意味着，如果你的代码使用许多SIGEV_THREAD定时器，你的程序可能会消耗太多的内存。无论如何，如果你的程序需要许多定时器，最好直接使用timeout事件代替。其他定时器（如SIGEV_SIGNAL）由内核处理，使用更少的系统资源。
+
+10 
 
 ### 第四章 进程间通信--Android的Binder
 
