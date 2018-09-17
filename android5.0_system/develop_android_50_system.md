@@ -3311,9 +3311,16 @@ int main(int argc, char *argv[])
 
 ##### 3.7 Android的log模块
 
+> Android 的log 输出量巨大，特别是通信系统的log很多。因此，Android把log输出到了不同的缓冲区
+>
 
+1） radio：输出通信系统的log
 
+2）system：输出系统组件的log
 
+3）event:输出event模块的log
+
+4）main:所有java层的log，以及不属于上面的3层的log。
 
 ### 第四章 进程间通信--Android的Binder
 
