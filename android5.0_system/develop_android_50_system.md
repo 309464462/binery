@@ -3303,9 +3303,13 @@ int main(int argc, char *argv[])
 
 
 
+  
 
+##### 3.5 Bionic中的线程管理函数
 
+##### 3.6 Futex同步机制
 
+##### 3.7 Android的log模块
 
 
 
