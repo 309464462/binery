@@ -3311,8 +3311,32 @@ int main(int argc, char *argv[])
 
 ##### 3.7 Android的log模块
 
+![1537239901537](/img/1537239901537.png)
+
+经过搜索：发现有两个log.java
+
+```
+\\192.168.1.8\share\lollipop-5.1.1_r6-release_3rd\frameworks\multidex\library\test\src\android\util\Log.java
+
+\\192.168.1.8\share\lollipop-5.1.1_r6-release_3rd\frameworks\ex\camera2\portability\src\com\android\ex\camera2\portability\debug\Log.java
+```
+
+在camera2中的log部分代码
+
+```
+ public static void d(Tag tag, String msg, Throwable tr) {
+        if (isLoggable(tag, android.util.Log.DEBUG)) {
+            android.util.Log.d(tag.toString(), msg, tr);
+        }
+    }
+
+```
+
+依旧是调用 android.util.Log.d。也就是第一个文件了。
+
+
+
 > Android 的log 输出量巨大，特别是通信系统的log很多。因此，Android把log输出到了不同的缓冲区
->
 
 1） radio：输出通信系统的log
 
