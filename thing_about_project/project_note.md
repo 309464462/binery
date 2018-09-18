@@ -67,6 +67,28 @@
 
 > prebuilts/gcc/linux-x86/arm/arm-eabi-4.7/bin/arm-eabi-addr2line -f -e out/dvb 22020 
 
+2.3 android studio查看系统源码
+
+利用AndroidStudio查看android源码，一般需要源码编译完成后生成  out/host/linux-x86/framework/idegen.jar ,该jar包是用于生成IDE工程中相关文件的工具。我们可以下载别人编译好的该jar包，放到相应路径下进行使用。具体操作步骤：
+
+1、下载idegen.jar（或者编译源码也可以生成），放到out/host/linux-x86/framework/  （如果路径不存在，新建）。
+
+2、在源码根目录下 运行 development/tools/idegen/idegen.sh 脚本。会在源码根目录下生成 android.iml、android.ipr两个文件。
+
+3、用androidStudio代开 android.ipr即可。
+
+
+
+注：
+
+在idegen.sh 脚本中实际运行的是 java -cp $idegenjar Main 命令。所以需要有idegen.jar。从名称也可以看出作用 IDE generate
+
+```
+https://pan.baidu.com/s/1Pt78LD4SHiYXBQ1BQGJhYg
+```
+
+
+
 ## 第三部分 异常处理
 
 第3章  

@@ -3315,7 +3315,7 @@ int main(int argc, char *argv[])
 
 经过搜索：发现有两个log.java
 
-```
+```java
 \\192.168.1.8\share\lollipop-5.1.1_r6-release_3rd\frameworks\multidex\library\test\src\android\util\Log.java
 
 \\192.168.1.8\share\lollipop-5.1.1_r6-release_3rd\frameworks\ex\camera2\portability\src\com\android\ex\camera2\portability\debug\Log.java
@@ -3323,7 +3323,7 @@ int main(int argc, char *argv[])
 
 在camera2中的log部分代码
 
-```
+```java
  public static void d(Tag tag, String msg, Throwable tr) {
         if (isLoggable(tag, android.util.Log.DEBUG)) {
             android.util.Log.d(tag.toString(), msg, tr);
@@ -3345,6 +3345,281 @@ int main(int argc, char *argv[])
 3）event:输出event模块的log
 
 4）main:所有java层的log，以及不属于上面的3层的log。
+
+3.7.2 log系统的接口和用法
+
+java层
+
+```java
+package android.util;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.net.UnknownHostException;
+
+public final class Log {
+    public static final int VERBOSE = 2;
+    public static final int DEBUG = 3;
+    public static final int INFO = 4;
+    public static final int WARN = 5;
+    public static final int ERROR = 6;
+    public static final int ASSERT = 7;
+
+    private Log() {
+    }
+    
+    public static int v(String tag, String msg) {
+        return println(LOG_ID_MAIN, VERBOSE, tag, msg);
+    }
+    
+    public static int v(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, VERBOSE, tag, msg + '\n' + getStackTraceString(tr));
+    }
+
+    public static int d(String tag, String msg) {
+        return println(LOG_ID_MAIN, DEBUG, tag, msg);
+    }
+    
+    public static int d(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, DEBUG, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static int i(String tag, String msg) {
+        return println(LOG_ID_MAIN, INFO, tag, msg);
+    }
+    
+    public static int i(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, INFO, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static int w(String tag, String msg) {
+        return println(LOG_ID_MAIN, WARN, tag, msg);
+    }
+    
+    public static int w(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, WARN, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static int w(String tag, Throwable tr) {
+        return println(LOG_ID_MAIN, WARN, tag, getStackTraceString(tr));
+    }
+    
+    public static int e(String tag, String msg) {
+        return println(LOG_ID_MAIN, ERROR, tag, msg);
+    }
+    
+    public static int e(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, ERROR, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static String getStackTraceString(Throwable tr) {
+        if (tr == null) {
+            return "";
+        }
+        
+        Throwable t = tr;
+        while (t != null) {
+            if (t instanceof UnknownHostException) {
+                return "";
+            }
+            t = t.getCause();
+        }
+
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        tr.printStackTrace(pw);
+        pw.flush();
+        return sw.toString();
+    }
+    
+    public static int println(int priority, String tag, String msg) {
+        return println(LOG_ID_MAIN, priority, tag, msg);
+    }
+
+    /** @hide */ public static final int LOG_ID_MAIN = 0;
+    /** @hide */ public static final int LOG_ID_RADIO = 1;
+    /** @hide */ public static final int LOG_ID_EVENTS = 2;
+    /** @hide */ public static final int LOG_ID_SYSTEM = 3;
+    /** @hide */ public static final int LOG_ID_CRASH = 4;
+
+    /** @hide */ @SuppressWarnings("unused")
+    public static int println(int bufID,
+            int priority, String tag, String msg) {
+        return 0;
+    }
+}
+
+```
+
+
+
+native层(\\192.168.1.112\public\nexell\lollipop-5.1.1_r6-release_3rd\frameworks\base\core\jni\android_util_Log.cpp)
+
+```cpp
+#define LOG_NAMESPACE "log.tag."
+#define LOG_TAG "Log_println"
+
+#include <assert.h>
+#include <cutils/properties.h>
+#include <utils/Log.h>
+#include <utils/String8.h>
+
+#include "jni.h"
+#include "JNIHelp.h"
+#include "utils/misc.h"
+#include "android_runtime/AndroidRuntime.h"
+#include "android_util_Log.h"
+
+#define MIN(a,b) ((a<b)?a:b)
+
+namespace android {
+
+struct levels_t {
+    jint verbose;
+    jint debug;
+    jint info;
+    jint warn;
+    jint error;
+    jint assert;
+};
+static levels_t levels;
+
+static int toLevel(const char* value)
+{
+    switch (value[0]) {
+        case 'V': return levels.verbose;
+        case 'D': return levels.debug;
+        case 'I': return levels.info;
+        case 'W': return levels.warn;
+        case 'E': return levels.error;
+        case 'A': return levels.assert;
+        case 'S': return -1; // SUPPRESS
+    }
+    return levels.info;
+}
+
+static jboolean isLoggable(const char* tag, jint level) {
+    String8 key;
+    key.append(LOG_NAMESPACE);
+    key.append(tag);
+
+    char buf[PROPERTY_VALUE_MAX];
+    if (property_get(key.string(), buf, "") <= 0) {
+        buf[0] = '\0';
+    }
+
+    int logLevel = toLevel(buf);
+    return logLevel >= 0 && level >= logLevel;
+}
+
+static jboolean android_util_Log_isLoggable(JNIEnv* env, jobject clazz, jstring tag, jint level)
+{
+    if (tag == NULL) {
+        return false;
+    }
+
+    const char* chars = env->GetStringUTFChars(tag, NULL);
+    if (!chars) {
+        return false;
+    }
+
+    jboolean result = false;
+    if ((strlen(chars)+sizeof(LOG_NAMESPACE)) > PROPERTY_KEY_MAX) {
+        char buf2[200];
+        snprintf(buf2, sizeof(buf2), "Log tag \"%s\" exceeds limit of %zu characters\n",
+                chars, PROPERTY_KEY_MAX - sizeof(LOG_NAMESPACE));
+
+        jniThrowException(env, "java/lang/IllegalArgumentException", buf2);
+    } else {
+        result = isLoggable(chars, level);
+    }
+
+    env->ReleaseStringUTFChars(tag, chars);
+    return result;
+}
+
+bool android_util_Log_isVerboseLogEnabled(const char* tag) {
+    return isLoggable(tag, levels.verbose);
+}
+
+/*
+ * In class android.util.Log:
+ *  public static native int println_native(int buffer, int priority, String tag, String msg)
+ */
+static jint android_util_Log_println_native(JNIEnv* env, jobject clazz,
+        jint bufID, jint priority, jstring tagObj, jstring msgObj)
+{
+    const char* tag = NULL;
+    const char* msg = NULL;
+
+    if (msgObj == NULL) {
+        jniThrowNullPointerException(env, "println needs a message");
+        return -1;
+    }
+
+    if (bufID < 0 || bufID >= LOG_ID_MAX) {
+        jniThrowNullPointerException(env, "bad bufID");
+        return -1;
+    }
+
+    if (tagObj != NULL)
+        tag = env->GetStringUTFChars(tagObj, NULL);
+    msg = env->GetStringUTFChars(msgObj, NULL);
+//这是关键
+    int res = __android_log_buf_write(bufID, (android_LogPriority)priority, tag, msg);
+
+    if (tag != NULL)
+        env->ReleaseStringUTFChars(tagObj, tag);
+    env->ReleaseStringUTFChars(msgObj, msg);
+
+    return res;
+}
+
+/*
+ * JNI registration.
+ */
+static JNINativeMethod gMethods[] = {
+    /* name, signature, funcPtr */
+    { "isLoggable",      "(Ljava/lang/String;I)Z", (void*) android_util_Log_isLoggable },
+    { "println_native",  "(IILjava/lang/String;Ljava/lang/String;)I", (void*) android_util_Log_println_native },
+};
+
+int register_android_util_Log(JNIEnv* env)
+{
+    jclass clazz = env->FindClass("android/util/Log");
+
+    if (clazz == NULL) {
+        ALOGE("Can't find android/util/Log");
+        return -1;
+    }
+//获取java中定义的值
+    levels.verbose = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "VERBOSE", "I"));
+    levels.debug = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "DEBUG", "I"));
+    levels.info = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "INFO", "I"));
+    levels.warn = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "WARN", "I"));
+    levels.error = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "ERROR", "I"));
+    levels.assert = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "ASSERT", "I"));
+
+    return AndroidRuntime::registerNativeMethods(env, "android/util/Log", gMethods, NELEM(gMethods));
+}
+
+}; // namespace android
+
+```
+
+
+
+__android_log_buf_write这个函数位于 libLog.so中， libLog.so源码位于
+
+
+
+代码如下：
+
+
+
+
+
+
 
 ### 第四章 进程间通信--Android的Binder
 
