@@ -3315,7 +3315,7 @@ int main(int argc, char *argv[])
 
 经过搜索：发现有两个log.java
 
-```
+```java
 \\192.168.1.8\share\lollipop-5.1.1_r6-release_3rd\frameworks\multidex\library\test\src\android\util\Log.java
 
 \\192.168.1.8\share\lollipop-5.1.1_r6-release_3rd\frameworks\ex\camera2\portability\src\com\android\ex\camera2\portability\debug\Log.java
@@ -3323,7 +3323,7 @@ int main(int argc, char *argv[])
 
 在camera2中的log部分代码
 
-```
+```java
  public static void d(Tag tag, String msg, Throwable tr) {
         if (isLoggable(tag, android.util.Log.DEBUG)) {
             android.util.Log.d(tag.toString(), msg, tr);
@@ -3345,6 +3345,452 @@ int main(int argc, char *argv[])
 3）event:输出event模块的log
 
 4）main:所有java层的log，以及不属于上面的3层的log。
+
+3.7.2 log系统的接口和用法
+
+java层
+
+```java
+package android.util;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.net.UnknownHostException;
+
+public final class Log {
+    public static final int VERBOSE = 2;
+    public static final int DEBUG = 3;
+    public static final int INFO = 4;
+    public static final int WARN = 5;
+    public static final int ERROR = 6;
+    public static final int ASSERT = 7;
+
+    private Log() {
+    }
+    
+    public static int v(String tag, String msg) {
+        return println(LOG_ID_MAIN, VERBOSE, tag, msg);
+    }
+    
+    public static int v(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, VERBOSE, tag, msg + '\n' + getStackTraceString(tr));
+    }
+
+    public static int d(String tag, String msg) {
+        return println(LOG_ID_MAIN, DEBUG, tag, msg);
+    }
+    
+    public static int d(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, DEBUG, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static int i(String tag, String msg) {
+        return println(LOG_ID_MAIN, INFO, tag, msg);
+    }
+    
+    public static int i(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, INFO, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static int w(String tag, String msg) {
+        return println(LOG_ID_MAIN, WARN, tag, msg);
+    }
+    
+    public static int w(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, WARN, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static int w(String tag, Throwable tr) {
+        return println(LOG_ID_MAIN, WARN, tag, getStackTraceString(tr));
+    }
+    
+    public static int e(String tag, String msg) {
+        return println(LOG_ID_MAIN, ERROR, tag, msg);
+    }
+    
+    public static int e(String tag, String msg, Throwable tr) {
+        return println(LOG_ID_MAIN, ERROR, tag, msg + '\n' + getStackTraceString(tr));
+    }
+    
+    public static String getStackTraceString(Throwable tr) {
+        if (tr == null) {
+            return "";
+        }
+        
+        Throwable t = tr;
+        while (t != null) {
+            if (t instanceof UnknownHostException) {
+                return "";
+            }
+            t = t.getCause();
+        }
+
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        tr.printStackTrace(pw);
+        pw.flush();
+        return sw.toString();
+    }
+    
+    public static int println(int priority, String tag, String msg) {
+        return println(LOG_ID_MAIN, priority, tag, msg);
+    }
+
+    /** @hide */ public static final int LOG_ID_MAIN = 0;
+    /** @hide */ public static final int LOG_ID_RADIO = 1;
+    /** @hide */ public static final int LOG_ID_EVENTS = 2;
+    /** @hide */ public static final int LOG_ID_SYSTEM = 3;
+    /** @hide */ public static final int LOG_ID_CRASH = 4;
+
+    /** @hide */ @SuppressWarnings("unused")
+    public static int println(int bufID,
+            int priority, String tag, String msg) {
+        return 0;
+    }
+}
+
+```
+
+
+
+native层(\\192.168.1.112\public\nexell\lollipop-5.1.1_r6-release_3rd\frameworks\base\core\jni\android_util_Log.cpp)
+
+```cpp
+#define LOG_NAMESPACE "log.tag."
+#define LOG_TAG "Log_println"
+
+#include <assert.h>
+#include <cutils/properties.h>
+#include <utils/Log.h>
+#include <utils/String8.h>
+
+#include "jni.h"
+#include "JNIHelp.h"
+#include "utils/misc.h"
+#include "android_runtime/AndroidRuntime.h"
+#include "android_util_Log.h"
+
+#define MIN(a,b) ((a<b)?a:b)
+
+namespace android {
+
+struct levels_t {
+    jint verbose;
+    jint debug;
+    jint info;
+    jint warn;
+    jint error;
+    jint assert;
+};
+static levels_t levels;
+
+static int toLevel(const char* value)
+{
+    switch (value[0]) {
+        case 'V': return levels.verbose;
+        case 'D': return levels.debug;
+        case 'I': return levels.info;
+        case 'W': return levels.warn;
+        case 'E': return levels.error;
+        case 'A': return levels.assert;
+        case 'S': return -1; // SUPPRESS
+    }
+    return levels.info;
+}
+
+static jboolean isLoggable(const char* tag, jint level) {
+    String8 key;
+    key.append(LOG_NAMESPACE);
+    key.append(tag);
+
+    char buf[PROPERTY_VALUE_MAX];
+    if (property_get(key.string(), buf, "") <= 0) {
+        buf[0] = '\0';
+    }
+
+    int logLevel = toLevel(buf);
+    return logLevel >= 0 && level >= logLevel;
+}
+
+static jboolean android_util_Log_isLoggable(JNIEnv* env, jobject clazz, jstring tag, jint level)
+{
+    if (tag == NULL) {
+        return false;
+    }
+
+    const char* chars = env->GetStringUTFChars(tag, NULL);
+    if (!chars) {
+        return false;
+    }
+
+    jboolean result = false;
+    if ((strlen(chars)+sizeof(LOG_NAMESPACE)) > PROPERTY_KEY_MAX) {
+        char buf2[200];
+        snprintf(buf2, sizeof(buf2), "Log tag \"%s\" exceeds limit of %zu characters\n",
+                chars, PROPERTY_KEY_MAX - sizeof(LOG_NAMESPACE));
+
+        jniThrowException(env, "java/lang/IllegalArgumentException", buf2);
+    } else {
+        result = isLoggable(chars, level);
+    }
+
+    env->ReleaseStringUTFChars(tag, chars);
+    return result;
+}
+
+bool android_util_Log_isVerboseLogEnabled(const char* tag) {
+    return isLoggable(tag, levels.verbose);
+}
+
+/*
+ * In class android.util.Log:
+ *  public static native int println_native(int buffer, int priority, String tag, String msg)
+ */
+static jint android_util_Log_println_native(JNIEnv* env, jobject clazz,
+        jint bufID, jint priority, jstring tagObj, jstring msgObj)
+{
+    const char* tag = NULL;
+    const char* msg = NULL;
+
+    if (msgObj == NULL) {
+        jniThrowNullPointerException(env, "println needs a message");
+        return -1;
+    }
+
+    if (bufID < 0 || bufID >= LOG_ID_MAX) {
+        jniThrowNullPointerException(env, "bad bufID");
+        return -1;
+    }
+
+    if (tagObj != NULL)
+        tag = env->GetStringUTFChars(tagObj, NULL);
+    msg = env->GetStringUTFChars(msgObj, NULL);
+//这是关键
+    int res = __android_log_buf_write(bufID, (android_LogPriority)priority, tag, msg);
+
+    if (tag != NULL)
+        env->ReleaseStringUTFChars(tagObj, tag);
+    env->ReleaseStringUTFChars(msgObj, msg);
+
+    return res;
+}
+
+/*
+ * JNI registration.
+ */
+static JNINativeMethod gMethods[] = {
+    /* name, signature, funcPtr */
+    { "isLoggable",      "(Ljava/lang/String;I)Z", (void*) android_util_Log_isLoggable },
+    { "println_native",  "(IILjava/lang/String;Ljava/lang/String;)I", (void*) android_util_Log_println_native },
+};
+
+int register_android_util_Log(JNIEnv* env)
+{
+    jclass clazz = env->FindClass("android/util/Log");
+
+    if (clazz == NULL) {
+        ALOGE("Can't find android/util/Log");
+        return -1;
+    }
+//获取java中定义的值
+    levels.verbose = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "VERBOSE", "I"));
+    levels.debug = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "DEBUG", "I"));
+    levels.info = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "INFO", "I"));
+    levels.warn = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "WARN", "I"));
+    levels.error = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "ERROR", "I"));
+    levels.assert = env->GetStaticIntField(clazz, env->GetStaticFieldID(clazz, "ASSERT", "I"));
+
+    return AndroidRuntime::registerNativeMethods(env, "android/util/Log", gMethods, NELEM(gMethods));
+}
+
+}; // namespace android
+
+```
+
+其中 log.h路径如下
+
+```
+\\192.168.1.112\public\nexell\lollipop-5.1.1_r6-release_3rd\frameworks\ex\framesequence\jni\utils\log.h
+```
+
+```h
+#ifndef ALOGV
+#if LOG_NDEBUG
+#define ALOGV(...)   ((void)0)
+#else
+#define ALOGV(...) ((void)ALOG(LOG_VERBOSE, LOG_TAG, __VA_ARGS__))
+#endif
+#endif
+
+#define CONDITION(cond)     (__builtin_expect((cond)!=0, 0))
+
+#ifndef ALOGV_IF
+#if LOG_NDEBUG
+#define ALOGV_IF(cond, ...)   ((void)0)
+#else
+#define ALOGV_IF(cond, ...) \
+    ( (CONDITION(cond)) \
+    ? ((void)ALOG(LOG_VERBOSE, LOG_TAG, __VA_ARGS__)) \
+    : (void)0 )
+#endif
+#endif
+```
+
+最终都是 ALOG 这个宏，定义在 #include <android/log.h>这个文件中
+
+__android_log_buf_write这个函数位于 libLog.so中，
+
+![1537314092989](/ing/1537314092989.png)
+
+根据脚本确定liblog使用的是那个源文件。
+
+```
+ifneq ($(TARGET_USES_LOGD),false) ##如果不相等
+liblog_sources := logd_write.c
+else
+liblog_sources := logd_write_kern.c
+endif
+
+liblog_host_sources := $(liblog_sources) fake_log_device.c
+liblog_target_sources := $(liblog_sources) log_time.cpp
+ifneq ($(TARGET_USES_LOGD),false)
+liblog_target_sources += log_read.c
+else
+liblog_target_sources += log_read_kern.c
+endif
+
+# Shared and static library for host
+# ========================================================
+LOCAL_MODULE := liblog
+LOCAL_SRC_FILES := $(liblog_host_sources)
+LOCAL_CFLAGS := -DFAKE_LOG_DEVICE=1 -Werror
+LOCAL_MULTILIB := both
+include $(BUILD_HOST_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblog
+LOCAL_WHOLE_STATIC_LIBRARIES := liblog
+ifeq ($(strip $(HOST_OS)),linux)
+LOCAL_LDLIBS := -lrt
+endif
+LOCAL_MULTILIB := both
+include $(BUILD_HOST_SHARED_LIBRARY)
+
+
+# Shared and static library for target
+# ========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblog
+LOCAL_SRC_FILES := $(liblog_target_sources)
+LOCAL_CFLAGS := -Werror
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblog
+LOCAL_WHOLE_STATIC_LIBRARIES := liblog
+LOCAL_CFLAGS := -Werror
+include $(BUILD_SHARED_LIBRARY)
+
+include $(call first-makefiles-under,$(LOCAL_PATH))
+
+```
+
+虽然是两个文件，其实里面的定义是一样的，如下。
+
+```cpp
+int __android_log_buf_write(int bufID, int prio, const char *tag, const char *msg)
+{
+    struct iovec vec[3];
+    char tmp_tag[32];
+
+    if (!tag)
+        tag = "";
+
+    /* XXX: This needs to go! */
+    if ((bufID != LOG_ID_RADIO) &&
+         (!strcmp(tag, "HTC_RIL") ||
+        !strncmp(tag, "RIL", 3) || /* Any log tag with "RIL" as the prefix */
+        !strncmp(tag, "IMS", 3) || /* Any log tag with "IMS" as the prefix */
+        !strcmp(tag, "AT") ||
+        !strcmp(tag, "GSM") ||
+        !strcmp(tag, "STK") ||
+        !strcmp(tag, "CDMA") ||
+        !strcmp(tag, "PHONE") ||
+        !strcmp(tag, "SMS"))) {
+            bufID = LOG_ID_RADIO;
+            /* Inform third party apps/ril/radio.. to use Rlog or RLOG */
+            snprintf(tmp_tag, sizeof(tmp_tag), "use-Rlog/RLOG-%s", tag);
+            tag = tmp_tag;
+    }
+
+    vec[0].iov_base   = (unsigned char *) &prio;
+    vec[0].iov_len    = 1;
+    vec[1].iov_base   = (void *) tag;
+    vec[1].iov_len    = strlen(tag) + 1;
+    vec[2].iov_base   = (void *) msg;
+    vec[2].iov_len    = strlen(msg) + 1;
+
+    return write_to_log(bufID, vec, 3);
+}
+```
+
+```cpp
+struct iovec{
+     void *iov_base; /* Pointer to data. */
+     size_t iov_len; /* Length of data. */
+};
+```
+
+```cpp
+static int __write_to_log_init(log_id_t, struct iovec *vec, size_t nr);
+static int (*write_to_log)(log_id_t, struct iovec *vec, size_t nr) = __write_to_log_init;
+```
+
+write_to_log 初始化指向__write_to_log_init函数
+
+实际的物理接口是kern中的定义
+
+```cpp
+static int __write_to_log_init(log_id_t log_id, struct iovec *vec, size_t nr)
+{
+#ifdef HAVE_PTHREADS
+    pthread_mutex_lock(&log_init_lock);
+#endif
+
+    if (write_to_log == __write_to_log_init) {
+        log_fds[LOG_ID_MAIN] = log_open("/dev/"LOGGER_LOG_MAIN, O_WRONLY);
+        log_fds[LOG_ID_RADIO] = log_open("/dev/"LOGGER_LOG_RADIO, O_WRONLY);
+        log_fds[LOG_ID_EVENTS] = log_open("/dev/"LOGGER_LOG_EVENTS, O_WRONLY);
+        log_fds[LOG_ID_SYSTEM] = log_open("/dev/"LOGGER_LOG_SYSTEM, O_WRONLY);
+
+        write_to_log = __write_to_log_kernel;
+
+        if (log_fds[LOG_ID_MAIN] < 0 || log_fds[LOG_ID_RADIO] < 0 ||
+                log_fds[LOG_ID_EVENTS] < 0) {
+            log_close(log_fds[LOG_ID_MAIN]);
+            log_close(log_fds[LOG_ID_RADIO]);
+            log_close(log_fds[LOG_ID_EVENTS]);
+            log_fds[LOG_ID_MAIN] = -1;
+            log_fds[LOG_ID_RADIO] = -1;
+            log_fds[LOG_ID_EVENTS] = -1;
+            write_to_log = __write_to_log_null;
+        }
+
+        if (log_fds[LOG_ID_SYSTEM] < 0) {
+            log_fds[LOG_ID_SYSTEM] = log_fds[LOG_ID_MAIN];
+        }
+    }
+
+#ifdef HAVE_PTHREADS
+    pthread_mutex_unlock(&log_init_lock);
+#endif
+
+    return write_to_log(log_id, vec, nr);
+}
+
+```
+
+
 
 ### 第四章 进程间通信--Android的Binder
 
