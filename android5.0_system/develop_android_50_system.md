@@ -3841,6 +3841,22 @@ log_writev是一个宏，由FAKE_LOG_DEVICE控制
 #endif
 ```
 
+##### 3.8 可执行文件分析
+
+3.8.1 ELF格式简介
+
+> ELF格式的文件有3种：可执行文件、动态库（so）、和重定向文件(.o文件)
+
+![1537350909189](E:\mybook\book_principal_work\android5.0_system\img\%5CUsers%5CAdministrator%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537350909189.png)
+
+3.8.2 ELF头文件格式
+
+![1537350987945](E:\mybook\book_principal_work\android5.0_system\img\%5CUsers%5CAdministrator%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537350987945.png)
+
+arm-eabi-readelf和arm-eabi-objdump。使用这两个工具能够了解ELF文件的各种信息
+
+
+
 
 
 ### 第四章 进程间通信--Android的Binder
