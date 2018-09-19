@@ -3607,15 +3607,146 @@ int register_android_util_Log(JNIEnv* env)
 
 ```
 
+其中 log.h路径如下
+
+```
+\\192.168.1.112\public\nexell\lollipop-5.1.1_r6-release_3rd\frameworks\ex\framesequence\jni\utils\log.h
+```
+
+```h
+#ifndef ALOGV
+#if LOG_NDEBUG
+#define ALOGV(...)   ((void)0)
+#else
+#define ALOGV(...) ((void)ALOG(LOG_VERBOSE, LOG_TAG, __VA_ARGS__))
+#endif
+#endif
+
+#define CONDITION(cond)     (__builtin_expect((cond)!=0, 0))
+
+#ifndef ALOGV_IF
+#if LOG_NDEBUG
+#define ALOGV_IF(cond, ...)   ((void)0)
+#else
+#define ALOGV_IF(cond, ...) \
+    ( (CONDITION(cond)) \
+    ? ((void)ALOG(LOG_VERBOSE, LOG_TAG, __VA_ARGS__)) \
+    : (void)0 )
+#endif
+#endif
+```
+
+最终都是 ALOG 这个宏，定义在 #include <android/log.h>这个文件中
+
+__android_log_buf_write这个函数位于 libLog.so中，
+
+![1537314092989](/ing/1537314092989.png)
+
+根据脚本确定liblog使用的是那个源文件。
+
+```
+ifneq ($(TARGET_USES_LOGD),false) ##如果不相等
+liblog_sources := logd_write.c
+else
+liblog_sources := logd_write_kern.c
+endif
+
+liblog_host_sources := $(liblog_sources) fake_log_device.c
+liblog_target_sources := $(liblog_sources) log_time.cpp
+ifneq ($(TARGET_USES_LOGD),false)
+liblog_target_sources += log_read.c
+else
+liblog_target_sources += log_read_kern.c
+endif
+
+# Shared and static library for host
+# ========================================================
+LOCAL_MODULE := liblog
+LOCAL_SRC_FILES := $(liblog_host_sources)
+LOCAL_CFLAGS := -DFAKE_LOG_DEVICE=1 -Werror
+LOCAL_MULTILIB := both
+include $(BUILD_HOST_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblog
+LOCAL_WHOLE_STATIC_LIBRARIES := liblog
+ifeq ($(strip $(HOST_OS)),linux)
+LOCAL_LDLIBS := -lrt
+endif
+LOCAL_MULTILIB := both
+include $(BUILD_HOST_SHARED_LIBRARY)
 
 
-__android_log_buf_write这个函数位于 libLog.so中， libLog.so源码位于
+# Shared and static library for target
+# ========================================================
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblog
+LOCAL_SRC_FILES := $(liblog_target_sources)
+LOCAL_CFLAGS := -Werror
+include $(BUILD_STATIC_LIBRARY)
 
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblog
+LOCAL_WHOLE_STATIC_LIBRARIES := liblog
+LOCAL_CFLAGS := -Werror
+include $(BUILD_SHARED_LIBRARY)
 
+include $(call first-makefiles-under,$(LOCAL_PATH))
 
-代码如下：
+```
 
+虽然是两个文件，其实里面的定义是一样的，如下。
 
+```cpp
+int __android_log_buf_write(int bufID, int prio, const char *tag, const char *msg)
+{
+    struct iovec vec[3];
+    char tmp_tag[32];
+
+    if (!tag)
+        tag = "";
+
+    /* XXX: This needs to go! */
+    if ((bufID != LOG_ID_RADIO) &&
+         (!strcmp(tag, "HTC_RIL") ||
+        !strncmp(tag, "RIL", 3) || /* Any log tag with "RIL" as the prefix */
+        !strncmp(tag, "IMS", 3) || /* Any log tag with "IMS" as the prefix */
+        !strcmp(tag, "AT") ||
+        !strcmp(tag, "GSM") ||
+        !strcmp(tag, "STK") ||
+        !strcmp(tag, "CDMA") ||
+        !strcmp(tag, "PHONE") ||
+        !strcmp(tag, "SMS"))) {
+            bufID = LOG_ID_RADIO;
+            /* Inform third party apps/ril/radio.. to use Rlog or RLOG */
+            snprintf(tmp_tag, sizeof(tmp_tag), "use-Rlog/RLOG-%s", tag);
+            tag = tmp_tag;
+    }
+
+    vec[0].iov_base   = (unsigned char *) &prio;
+    vec[0].iov_len    = 1;
+    vec[1].iov_base   = (void *) tag;
+    vec[1].iov_len    = strlen(tag) + 1;
+    vec[2].iov_base   = (void *) msg;
+    vec[2].iov_len    = strlen(msg) + 1;
+
+    return write_to_log(bufID, vec, 3);
+}
+```
+
+```cpp
+struct iovec{
+     void *iov_base; /* Pointer to data. */
+     size_t iov_len; /* Length of data. */
+};
+```
+
+```cpp
+static int __write_to_log_init(log_id_t, struct iovec *vec, size_t nr);
+static int (*write_to_log)(log_id_t, struct iovec *vec, size_t nr) = __write_to_log_init;
+```
+
+write_to_log 初始化指向__write_to_log_init函数
 
 
 
