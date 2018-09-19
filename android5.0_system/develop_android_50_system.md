@@ -3748,7 +3748,47 @@ static int (*write_to_log)(log_id_t, struct iovec *vec, size_t nr) = __write_to_
 
 write_to_log 初始化指向__write_to_log_init函数
 
+实际的物理接口是kern中的定义
 
+```cpp
+static int __write_to_log_init(log_id_t log_id, struct iovec *vec, size_t nr)
+{
+#ifdef HAVE_PTHREADS
+    pthread_mutex_lock(&log_init_lock);
+#endif
+
+    if (write_to_log == __write_to_log_init) {
+        log_fds[LOG_ID_MAIN] = log_open("/dev/"LOGGER_LOG_MAIN, O_WRONLY);
+        log_fds[LOG_ID_RADIO] = log_open("/dev/"LOGGER_LOG_RADIO, O_WRONLY);
+        log_fds[LOG_ID_EVENTS] = log_open("/dev/"LOGGER_LOG_EVENTS, O_WRONLY);
+        log_fds[LOG_ID_SYSTEM] = log_open("/dev/"LOGGER_LOG_SYSTEM, O_WRONLY);
+
+        write_to_log = __write_to_log_kernel;
+
+        if (log_fds[LOG_ID_MAIN] < 0 || log_fds[LOG_ID_RADIO] < 0 ||
+                log_fds[LOG_ID_EVENTS] < 0) {
+            log_close(log_fds[LOG_ID_MAIN]);
+            log_close(log_fds[LOG_ID_RADIO]);
+            log_close(log_fds[LOG_ID_EVENTS]);
+            log_fds[LOG_ID_MAIN] = -1;
+            log_fds[LOG_ID_RADIO] = -1;
+            log_fds[LOG_ID_EVENTS] = -1;
+            write_to_log = __write_to_log_null;
+        }
+
+        if (log_fds[LOG_ID_SYSTEM] < 0) {
+            log_fds[LOG_ID_SYSTEM] = log_fds[LOG_ID_MAIN];
+        }
+    }
+
+#ifdef HAVE_PTHREADS
+    pthread_mutex_unlock(&log_init_lock);
+#endif
+
+    return write_to_log(log_id, vec, nr);
+}
+
+```
 
 
 
