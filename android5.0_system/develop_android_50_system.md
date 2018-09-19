@@ -1,8 +1,8 @@
 ---
-typora-root-url: ./
+ptypora-root-url: ./
 ---
 
-### 第一章 建立Android系统开发环境
+第一章 建立Android系统开发环境
 
 #### 1.1 安装系统
 
@@ -3788,6 +3788,57 @@ static int __write_to_log_init(log_id_t log_id, struct iovec *vec, size_t nr)
     return write_to_log(log_id, vec, nr);
 }
 
+```
+
+__write_to_log_kernel 很简单
+
+```cpp
+static int __write_to_log_kernel(log_id_t log_id, struct iovec *vec, size_t nr)
+{
+    ssize_t ret;
+    int log_fd;
+
+    if (/*(int)log_id >= 0 &&*/ (int)log_id < (int)LOG_ID_MAX) {
+        if (log_id == LOG_ID_CRASH) {
+            log_id = LOG_ID_MAIN;
+        }
+        log_fd = log_fds[(int)log_id];
+    } else {
+        return -EBADF;
+    }
+
+    do {
+        ret = log_writev(log_fd, vec, nr);
+        if (ret < 0) {
+            ret = -errno;
+        }
+    } while (ret == -EINTR);
+
+    return ret;
+}
+```
+
+log_writev是一个宏，由FAKE_LOG_DEVICE控制
+
+```c
+#define LOGGER_LOG_MAIN		"log/main"
+#define LOGGER_LOG_RADIO	"log/radio"
+#define LOGGER_LOG_EVENTS	"log/events"
+#define LOGGER_LOG_SYSTEM	"log/system"
+
+#define LOG_BUF_SIZE 1024
+
+#if FAKE_LOG_DEVICE
+/* This will be defined when building for the host. */
+#include "fake_log_device.h"
+#define log_open(pathname, flags) fakeLogOpen(pathname, flags)
+#define log_writev(filedes, vector, count) fakeLogWritev(filedes, vector, count)
+#define log_close(filedes) fakeLogClose(filedes)
+#else
+#define log_open(pathname, flags) open(pathname, (flags) | O_CLOEXEC)
+#define log_writev(filedes, vector, count) writev(filedes, vector, count)
+#define log_close(filedes) close(filedes)
+#endif
 ```
 
 
