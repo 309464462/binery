@@ -3959,9 +3959,33 @@ ldd 可以区分静态可执行文件和动态可执行文件。
 
 4）IBinde对象：BBinder和BpBinder类都是从IBinder类中继承而来。在很多场合，不需要刻意地去区分实体对象和引用对象，这时可以使用“IBinder对象”来统一称呼它们。
 
-> 代理对象和引用对象分开的好处就是，代理对象可以有很多个。但是，它们包含的同一个引用对象，这样方便了用户层的使用，如下图中。
+> 代理对象和引用对象分开的好处就是，代理对象可以有很多个。但是，它们包含的同一个引用对象，这样方便了用户层的使用，如下图中。应用完全可以抛开接口对象直接使用Binder的引用对象，但是这样开发的程序兼容性不好。也正是在客户端将引用对象和代理对象分离，Android才能用一套架构处理java和native层提供的Binder 服务。
 
 ![1537886505720](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537886505720.png)
+
+4.1.2 Binder架构
+
+Binder通信的参与者由4个部分组成:
+
+1) Binder驱动：Binder和核心，实现各种Binder的底层操作。
+
+2）ServiceManager：提供Binder的名称到引对象的转换服务。
+
+3）服务端：Binder服务的提供者
+
+4）客户端：Binder服务的使用者。
+
+这个4部分的关系如图
+
+![1537887423442](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537887423442.png)
+
+> ServiceManger 实际上也是通过Binder框架来提供服务。用户进程可以使用参数0 直接构造出ServiceManger的引用对象，然后开始使用。
+>
+> Binder服务分为两种：实名服务和匿名服务。它们从开发到使用没有任何区别，唯一的区别是实名服务能够通过ServiceManger查询到。实名服务都是系统提供的。普通应用开发的Binder 服务，只能是匿名服务。 
+
+
+
+
 
 ### 第五章 连接 Java和 c/c++层的关键 ---Android的JNI
 
