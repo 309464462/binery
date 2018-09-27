@@ -3949,7 +3949,7 @@ ldd 可以区分静态可执行文件和动态可执行文件。
 
 ​	Android 在架构上一直希望模糊进程的概念，取而代之已组件的概念。应用不需要关系组件存放位置、组件运行在哪个进程中、组件的生命周期等问题。随时随地，只要拥有Binder对象，就能使用组件的功能。Binder就像一张网，将整个系统的组件，跨越进程和线程，组织在了一起。
 
-4.1.1 Binder对象定义
+##### 4.1.1 Binder对象定义
 
 1） Binder实体对象：Binde实体对象就是Binder服务的提供者。一个提供Binder服务的类必须继承BBinder类，一次，又是为了强调对象的类型也用"BBinder 对象"来代替“Binder 实体对象”
 
@@ -3963,7 +3963,7 @@ ldd 可以区分静态可执行文件和动态可执行文件。
 
 ![1537886505720](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537886505720.png)
 
-4.1.2 Binder架构
+##### 4.1.2 Binder架构
 
 Binder通信的参与者由4个部分组成:
 
@@ -3983,7 +3983,27 @@ Binder通信的参与者由4个部分组成:
 >
 > Binder服务分为两种：实名服务和匿名服务。它们从开发到使用没有任何区别，唯一的区别是实名服务能够通过ServiceManger查询到。实名服务都是系统提供的。普通应用开发的Binder 服务，只能是匿名服务。 
 
+##### 4.2.2 BInder的混合使用
 
+> Binder是可以混合调用的，在c++的代码中可以调用java语言编写的Binder服务，从java语言中也可以调用c++语言编写额服务，调用的方法就是直接使用服务的引用对象。
+
+#### 4.3 Binder应用层的核心类
+
+​                  ![1537975033250](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537975033250.png)           
+
+
+
+
+
+
+
+![1537975058069](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537975058069.png)
+
+
+
+
+
+![1537975118534](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537975118534.png)
 
 
 
