@@ -3945,6 +3945,68 @@ ldd 可以区分静态可执行文件和动态可执行文件。
 
 ### 第四章 进程间通信--Android的Binder
 
+> 除了socket、匿名管道（pipe）以外，传统的IPC ，如命名管道（FIFO）、信号量、消息队列等已经从Android中去掉了。和其他的IPC相比，Socket是一种比较成熟的通信手段，同步控制也很容易实现。Socket用于网络通信非常合适，但是用于进程间通信，效率就不太高了。
+
+​	Android 在架构上一直希望模糊进程的概念，取而代之已组件的概念。应用不需要关系组件存放位置、组件运行在哪个进程中、组件的生命周期等问题。随时随地，只要拥有Binder对象，就能使用组件的功能。Binder就像一张网，将整个系统的组件，跨越进程和线程，组织在了一起。
+
+##### 4.1.1 Binder对象定义
+
+1） Binder实体对象：Binde实体对象就是Binder服务的提供者。一个提供Binder服务的类必须继承BBinder类，一次，又是为了强调对象的类型也用"BBinder 对象"来代替“Binder 实体对象”
+
+2）Binder引对象：Binder引用对象是Binder实体对象在客户进程的代表，每个引用对象的类型都是BpBinder类，同样可以名称"BpBinder 对象"来代替“ Binder引用对象”
+
+3）Binder代理对象：代理对象也称为接口对象，它主要是为客户端的上层提供接口服务，从IInterface类派生。它实现了Binder服务的函数接口，当然只是一个转调的空壳。通过代理对象，应用能够像本地对象一样的使用远程的实体提供的服务。
+
+4）IBinde对象：BBinder和BpBinder类都是从IBinder类中继承而来。在很多场合，不需要刻意地去区分实体对象和引用对象，这时可以使用“IBinder对象”来统一称呼它们。
+
+> 代理对象和引用对象分开的好处就是，代理对象可以有很多个。但是，它们包含的同一个引用对象，这样方便了用户层的使用，如下图中。应用完全可以抛开接口对象直接使用Binder的引用对象，但是这样开发的程序兼容性不好。也正是在客户端将引用对象和代理对象分离，Android才能用一套架构处理java和native层提供的Binder 服务。
+
+![1537886505720](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537886505720.png)
+
+##### 4.1.2 Binder架构
+
+Binder通信的参与者由4个部分组成:
+
+1) Binder驱动：Binder和核心，实现各种Binder的底层操作。
+
+2）ServiceManager：提供Binder的名称到引对象的转换服务。
+
+3）服务端：Binder服务的提供者
+
+4）客户端：Binder服务的使用者。
+
+这个4部分的关系如图
+
+![1537887423442](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537887423442.png)
+
+> ServiceManger 实际上也是通过Binder框架来提供服务。用户进程可以使用参数0 直接构造出ServiceManger的引用对象，然后开始使用。
+>
+> Binder服务分为两种：实名服务和匿名服务。它们从开发到使用没有任何区别，唯一的区别是实名服务能够通过ServiceManger查询到。实名服务都是系统提供的。普通应用开发的Binder 服务，只能是匿名服务。 
+
+##### 4.2.2 BInder的混合使用
+
+> Binder是可以混合调用的，在c++的代码中可以调用java语言编写的Binder服务，从java语言中也可以调用c++语言编写额服务，调用的方法就是直接使用服务的引用对象。
+
+#### 4.3 Binder应用层的核心类
+
+​                  ![1537975033250](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537975033250.png)           
+
+
+
+
+
+
+
+![1537975058069](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537975058069.png)
+
+
+
+
+
+![1537975118534](E:\mybook\book_principal_work\android5.0_system\ing\%5CUsers%5Celvin%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5C1537975118534.png)
+
+
+
 ### 第五章 连接 Java和 c/c++层的关键 ---Android的JNI
 
 ### 第六章 Android的同步和消息机制
